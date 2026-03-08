@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1] - 2026-03-08
+
+### Changed
+- README bilingual documentation (English + Chinese / 中英文对照文档)
+
 ## [0.1.0] - 2026-03-08
 
 ### Added
