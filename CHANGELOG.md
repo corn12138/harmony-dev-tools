@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.2] - 2026-03-08
+
+### Added
+- **HDC Auto-Detection** — automatically finds HDC executable across platforms:
+  - Scans well-known SDK paths: macOS (`~/Library/OpenHarmony/Sdk`, DevEco Studio), Windows (`%LOCALAPPDATA%\OpenHarmony\Sdk`, `C:\DevEcoStudio`), Linux (`~/OpenHarmony/Sdk`)
+  - Prefers highest SDK version when multiple are installed
+  - Caches result for the session (no repeated filesystem scans)
+  - Falls back to interactive dialog: "Browse for HDC" or "Open Settings"
+- Users no longer need to manually configure `harmony.hdcPath` in most cases
+
 ## [0.2.1] - 2026-03-08
 
 ### Added
