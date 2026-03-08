@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Lightweight & powerful HarmonyOS development toolkit for VS Code",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -25,11 +25,14 @@
   ],
   "keywords": [
     "HarmonyOS",
+    "HarmonyOS NEXT",
     "ArkTS",
     "ArkUI",
     "OpenHarmony",
     "鸿蒙",
-    "ets"
+    "ets",
+    "Cangjie",
+    "仓颉"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -86,6 +89,10 @@
       {
         "fileMatch": "**/AppScope/app.json5",
         "url": "./schemas/app.schema.json"
+      },
+      {
+        "fileMatch": "**/hvigor/hvigor-config.json5",
+        "url": "./schemas/hvigor-config.schema.json"
       }
     ],
     "commands": [

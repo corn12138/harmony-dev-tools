@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Hvigor Config",
+  "description": "HarmonyOS hvigor build tool configuration (hvigor-config.json5)",
+  "type": "object",
+  "properties": {
+    "modelVersion": {
+      "type": "string",
+      "description": "Hvigor model version. Required for API 12+. / Hvigor 模型版本，API 12+ 必需。",
+      "examples": ["5.0.0"]
+    },
+    "hvigorVersion": {
+      "type": "string",
+      "description": "[Deprecated in API 12+] Hvigor tool version. / [API 12+ 已弃用] Hvigor 工具版本。",
+      "examples": ["4.2.0"]
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "Hvigor plugin dependencies / Hvigor 插件依赖",
+      "properties": {
+        "@ohos/hvigor-ohos-plugin": {
+          "type": "string",
+          "description": "[Deprecated in API 12+] HarmonyOS build plugin version"
+        }
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "execution": {
+      "type": "object",
+      "description": "Build execution configuration / 构建执行配置",
+      "properties": {
+        "daemon": {
+          "type": "boolean",
+          "description": "Enable daemon mode for faster builds / 启用守护进程模式加速构建",
+          "default": true
+        },
+        "incremental": {
+          "type": "boolean",
+          "description": "Enable incremental compilation / 启用增量编译",
+          "default": true
+        },
+        "parallel": {
+          "type": "boolean",
+          "description": "Enable parallel task execution / 启用并行任务执行",
+          "default": true
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["debug", "info", "warn", "error"],
+          "default": "info"
+        }
+      }
+    },
+    "nodeOptions": {
+      "type": "object",
+      "description": "Node.js runtime options / Node.js 运行时选项",
+      "properties": {
+        "maxOldSpaceSize": {
+          "type": "number",
+          "description": "Max old generation heap size in MB",
+          "default": 4096
+        }
+      }
+    }
+  }
+}

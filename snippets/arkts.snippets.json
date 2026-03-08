@@ -493,5 +493,185 @@
       "}"
     ],
     "description": "@Extend component attribute extension"
+  },
+
+  "ComponentV2 Entry (V2)": {
+    "prefix": "entryv2",
+    "body": [
+      "@Entry",
+      "@ComponentV2",
+      "struct ${1:PageName} {",
+      "  @Local message: string = '${2:Hello World}';",
+      "",
+      "  build() {",
+      "    Column() {",
+      "      Text(this.message)",
+      "        .fontSize(24)",
+      "        .fontWeight(FontWeight.Bold)",
+      "      $0",
+      "    }",
+      "    .width('100%')",
+      "    .height('100%')",
+      "    .justifyContent(FlexAlign.Center)",
+      "  }",
+      "}"
+    ],
+    "description": "[V2] Create an @Entry @ComponentV2 page (API 12+)"
+  },
+  "ComponentV2": {
+    "prefix": "compv2",
+    "body": [
+      "@ComponentV2",
+      "struct ${1:ComponentName} {",
+      "  @Param ${2:title}: string = '';",
+      "",
+      "  build() {",
+      "    ${3:Column}() {",
+      "      $0",
+      "    }",
+      "  }",
+      "}"
+    ],
+    "description": "[V2] Create a @ComponentV2 struct (API 12+)"
+  },
+  "@Local Variable (V2)": {
+    "prefix": "local",
+    "body": "@Local ${1:name}: ${2:string} = ${3:''};",
+    "description": "[V2] @Local component internal state (replaces @State)"
+  },
+  "@Param Variable (V2)": {
+    "prefix": "param",
+    "body": "@Param ${1:name}: ${2:string} = ${3:''};",
+    "description": "[V2] @Param parent-to-child data (replaces @Prop)"
+  },
+  "@Event Callback (V2)": {
+    "prefix": "event",
+    "body": "@Event ${1:onAction}: (${2:value}: ${3:string}) => void = (${2:value}) => {};",
+    "description": "[V2] @Event child-to-parent callback"
+  },
+  "@Monitor Watcher (V2)": {
+    "prefix": "monitor",
+    "body": [
+      "@Monitor('${1:propertyName}')",
+      "${2:onPropertyChange}(monitor: IMonitor): void {",
+      "  $0",
+      "}"
+    ],
+    "description": "[V2] @Monitor deep property change watcher (replaces @Watch)"
+  },
+  "@Computed Property (V2)": {
+    "prefix": "computed",
+    "body": [
+      "@Computed",
+      "get ${1:computedValue}(): ${2:string} {",
+      "  return ${3:this.value};",
+      "}"
+    ],
+    "description": "[V2] @Computed derived property"
+  },
+  "@ObservedV2 Class (V2)": {
+    "prefix": "observedv2",
+    "body": [
+      "@ObservedV2",
+      "class ${1:MyModel} {",
+      "  @Trace ${2:name}: string = '${3}';",
+      "  @Trace ${4:count}: number = ${5:0};",
+      "  $0",
+      "}"
+    ],
+    "description": "[V2] @ObservedV2 + @Trace deep observable class"
+  },
+  "@Provider/@Consumer (V2)": {
+    "prefix": "providerv2",
+    "body": [
+      "// In ancestor component:",
+      "@Provider('${1:key}') ${2:sharedData}: ${3:string} = '${4}';",
+      "",
+      "// In descendant component:",
+      "@Consumer('${1:key}') ${2:sharedData}: ${3:string} = '';"
+    ],
+    "description": "[V2] @Provider/@Consumer cross-component data sharing"
+  },
+  "AppStorageV2 (V2)": {
+    "prefix": "appstoragev2",
+    "body": [
+      "import { AppStorageV2 } from '@kit.ArkUI';",
+      "",
+      "// Connect to global state",
+      "const ${1:store} = AppStorageV2.connect(",
+      "  ${2:MyModel},",
+      "  '${3:storeKey}',",
+      "  () => new ${2:MyModel}()",
+      ")!;",
+      "$0"
+    ],
+    "description": "[V2] AppStorageV2 global state management (API 12+)"
+  },
+  "V1 to V2 Migration Comment": {
+    "prefix": "v2migrate",
+    "body": [
+      "// V1 → V2 Migration Guide:",
+      "// @Component   → @ComponentV2",
+      "// @State       → @Local",
+      "// @Prop        → @Param",
+      "// @Link        → @Param + @Event",
+      "// @Provide     → @Provider",
+      "// @Consume     → @Consumer",
+      "// @Watch       → @Monitor",
+      "// @Observed    → @ObservedV2",
+      "// @ObjectLink  → (use @Param with @ObservedV2 class)",
+      "// new: @Computed, @Once, @Event",
+      "$0"
+    ],
+    "description": "V1 to V2 decorator migration reference comment"
+  },
+  "WaterFlow Layout": {
+    "prefix": "waterflow",
+    "body": [
+      "WaterFlow() {",
+      "  ForEach(this.${1:items}, (item: ${2:string}) => {",
+      "    FlowItem() {",
+      "      $0",
+      "    }",
+      "  })",
+      "}",
+      ".columnsTemplate('${3:1fr 1fr}')",
+      ".columnsGap(${4:10})",
+      ".rowsGap(${5:10})"
+    ],
+    "description": "WaterFlow (waterfall) layout"
+  },
+  "RelativeContainer Layout": {
+    "prefix": "relative",
+    "body": [
+      "RelativeContainer() {",
+      "  $0",
+      "}",
+      ".width('100%')",
+      ".height(${1:300})"
+    ],
+    "description": "RelativeContainer layout"
+  },
+  "Web Component": {
+    "prefix": "web",
+    "body": [
+      "Web({ src: '${1:https://example.com}', controller: this.${2:webController} })",
+      "  .width('100%')",
+      "  .height('${3:100%}')"
+    ],
+    "description": "Web component for HTML content"
+  },
+  "XComponent": {
+    "prefix": "xcomp",
+    "body": [
+      "XComponent({",
+      "  id: '${1:xcomponent}',",
+      "  type: XComponentType.${2:SURFACE},",
+      "  libraryname: '${3:nativerender}'",
+      "})",
+      ".width('100%')",
+      ".height(${4:300})"
+    ],
+    "description": "XComponent for native rendering (Canvas/Game)"
   }
 }

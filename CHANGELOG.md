@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.2.0] - 2026-03-08
+
+### Added
+- **V2 State Management decorators** (API 12+ / HarmonyOS NEXT):
+  - @ComponentV2, @Local, @Param, @Once, @Event, @Monitor, @Computed
+  - @ObservedV2, @Trace, @Provider, @Consumer
+  - Bilingual hover documentation (English + Chinese) for all V1 and V2 decorators
+- **15+ new code snippets** for V2:
+  - `entryv2` — @Entry + @ComponentV2 page template
+  - `compv2` — @ComponentV2 struct
+  - `local` / `param` / `event` / `monitor` / `computed` — V2 state decorators
+  - `observedv2` — @ObservedV2 + @Trace class
+  - `providerv2` — @Provider/@Consumer pattern
+  - `appstoragev2` — AppStorageV2 global state
+  - `v2migrate` — V1 to V2 migration reference
+  - `waterflow` / `relative` / `web` / `xcomp` — new ArkUI components
+- **30+ new ArkUI components** in auto-completion:
+  - GridRow, GridCol, ListItemGroup, FolderStack, CheckboxGroup
+  - RichEditor, XComponent, Canvas, Shape drawing components
+  - Menu/MenuItem, CalendarPicker, SymbolGlyph, NodeContainer, etc.
+- **hvigor-config.json5 schema validation** — modelVersion, execution, dependencies
+- **HarmonyOS NEXT / Cangjie** keywords for marketplace discoverability
+
+### Changed
+- Decorator hover docs now bilingual (English + Chinese)
+- ArkUI component list expanded from 40 to 70+ components
+
 ## [0.1.1] - 2026-03-08
 
 ### Changed

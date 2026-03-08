@@ -2,14 +2,26 @@ import * as vscode from 'vscode';
 import { ARKTS_DECORATORS } from '../utils/constants';
 
 const ARKUI_COMPONENTS = [
-  'Column', 'Row', 'Stack', 'Flex', 'Grid', 'GridItem', 'List', 'ListItem',
+  // Layout containers
+  'Column', 'Row', 'Stack', 'Flex', 'Grid', 'GridItem', 'GridRow', 'GridCol',
+  'List', 'ListItem', 'ListItemGroup',
   'Scroll', 'Tabs', 'TabContent', 'Swiper', 'Navigation', 'NavRouter', 'NavDestination',
-  'Text', 'Span', 'Button', 'Image', 'TextInput', 'TextArea', 'Toggle',
-  'Radio', 'Checkbox', 'Select', 'Slider', 'Progress', 'LoadingProgress',
+  'WaterFlow', 'FlowItem', 'RelativeContainer', 'SideBarContainer', 'FolderStack',
+  // Basic components
+  'Text', 'Span', 'Button', 'Image', 'ImageSpan', 'TextInput', 'TextArea', 'Toggle',
+  'Radio', 'Checkbox', 'CheckboxGroup', 'Select', 'Slider', 'Progress', 'LoadingProgress',
   'Divider', 'Blank', 'Search', 'Rating', 'Stepper', 'StepperItem',
-  'Badge', 'Marquee', 'Counter', 'DatePicker', 'TimePicker',
-  'AlphabetIndexer', 'Panel', 'Refresh', 'WaterFlow', 'FlowItem',
-  'RelativeContainer', 'SideBarContainer', 'Web', 'RichText', 'Video',
+  'Badge', 'Marquee', 'Counter', 'DatePicker', 'TimePicker', 'TextPicker', 'TextClock', 'TextTimer',
+  'AlphabetIndexer', 'Panel', 'Refresh', 'PatternLock',
+  // Media & Web
+  'Web', 'RichText', 'RichEditor', 'Video', 'XComponent',
+  // Canvas & Drawing
+  'Canvas', 'Circle', 'Ellipse', 'Line', 'Path', 'Polygon', 'Polyline', 'Rect', 'Shape',
+  // Menu & Dialog
+  'Menu', 'MenuItem', 'MenuItemGroup',
+  // HarmonyOS NEXT new components (API 12+)
+  'CalendarPicker', 'ContainerSpan', 'SymbolGlyph', 'SymbolSpan',
+  'NodeContainer', 'ContentSlot', 'ComponentContent',
 ];
 
 const LIFECYCLE_METHODS = [

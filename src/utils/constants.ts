@@ -38,13 +38,18 @@ export const CONTEXT_KEYS = {
 } as const;
 
 export const ARKTS_DECORATORS = [
-  // Component
+  // Component V1
   '@Component', '@Entry', '@CustomDialog', '@Builder', '@BuilderParam', '@Reusable', '@Preview',
-  // State management
+  // State management V1
   '@State', '@Prop', '@Link', '@Provide', '@Consume', '@Watch',
-  '@Observed', '@ObjectLink', '@ObservedV2', '@Trace',
+  '@Observed', '@ObjectLink',
+  // Component V2 (API 12+)
+  '@ComponentV2', '@ObservedV2', '@Trace', '@Local', '@Param', '@Once', '@Event',
+  '@Monitor', '@Computed', '@Provider', '@Consumer',
   // Style
   '@Styles', '@Extend', '@AnimatableExtend',
   // Concurrency
   '@Concurrent', '@Sendable',
+  // Ability
+  '@Ability',
 ] as const;
