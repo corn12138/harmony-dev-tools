@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Lightweight & powerful HarmonyOS development toolkit for VS Code",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
