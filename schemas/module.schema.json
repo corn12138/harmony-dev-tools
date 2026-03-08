@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "module.json5",
+  "description": "HarmonyOS 模块配置 / Module configuration",
+  "type": "object",
+  "properties": {
+    "module": {
+      "type": "object",
+      "description": "模块配置 / Module definition",
+      "properties": {
+        "name": { "type": "string", "description": "模块名称 / Module name (e.g., 'entry')" },
+        "type": {
+          "type": "string",
+          "enum": ["entry", "feature", "har", "shared"],
+          "description": "模块类型 / Module type"
+        },
+        "description": { "type": "string", "description": "模块描述" },
+        "mainElement": { "type": "string", "description": "入口 Ability 名称" },
+        "deviceTypes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["phone", "tablet", "tv", "wearable", "car", "2in1"]
+          },
+          "description": "支持的设备类型 / Supported device types"
+        },
+        "deliveryWithInstall": { "type": "boolean", "description": "是否随应用安装" },
+        "installationFree": { "type": "boolean", "description": "是否支持免安装" },
+        "pages": { "type": "string", "description": "页面配置文件路径 (e.g., '$profile:main_pages')" },
+        "abilities": {
+          "type": "array",
+          "description": "Ability 列表",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "Ability 名称" },
+              "srcEntry": { "type": "string", "description": "源码入口路径" },
+              "description": { "type": "string" },
+              "icon": { "type": "string", "description": "图标资源引用 (e.g., '$media:icon')" },
+              "label": { "type": "string", "description": "标签资源引用" },
+              "startWindowIcon": { "type": "string" },
+              "startWindowBackground": { "type": "string" },
+              "exported": { "type": "boolean", "description": "是否可被外部调用" },
+              "skills": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "entities": { "type": "array", "items": { "type": "string" } },
+                    "actions": { "type": "array", "items": { "type": "string" } }
+                  }
+                }
+              }
+            },
+            "required": ["name", "srcEntry"]
+          }
+        },
+        "extensionAbilities": {
+          "type": "array",
+          "description": "ExtensionAbility 列表",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "srcEntry": { "type": "string" },
+              "type": { "type": "string" }
+            }
+          }
+        },
+        "requestPermissions": {
+          "type": "array",
+          "description": "权限申请列表 / Requested permissions",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "权限名称 (e.g., 'ohos.permission.INTERNET')" },
+              "reason": { "type": "string", "description": "申请原因" },
+              "usedScene": {
+                "type": "object",
+                "properties": {
+                  "abilities": { "type": "array", "items": { "type": "string" } },
+                  "when": { "type": "string", "enum": ["inuse", "always"] }
+                }
+              }
+            },
+            "required": ["name"]
+          }
+        }
+      },
+      "required": ["name", "type"]
+    }
+  }
+}

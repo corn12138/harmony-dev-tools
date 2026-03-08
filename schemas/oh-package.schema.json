@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "oh-package.json5",
+  "description": "HarmonyOS 包管理配置 / Package management configuration",
+  "type": "object",
+  "properties": {
+    "name": { "type": "string", "description": "包名 / Package name" },
+    "version": { "type": "string", "description": "版本号 / Version (semver)" },
+    "description": { "type": "string", "description": "包描述 / Package description" },
+    "main": { "type": "string", "description": "入口文件 / Main entry file" },
+    "author": { "type": "string", "description": "作者 / Author" },
+    "license": { "type": "string", "description": "许可证 / License" },
+    "dependencies": {
+      "type": "object",
+      "description": "运行时依赖 / Runtime dependencies",
+      "additionalProperties": { "type": "string" }
+    },
+    "devDependencies": {
+      "type": "object",
+      "description": "开发依赖 / Dev dependencies",
+      "additionalProperties": { "type": "string" }
+    },
+    "dynamicDependencies": {
+      "type": "object",
+      "description": "动态依赖 / Dynamic dependencies",
+      "additionalProperties": { "type": "string" }
+    },
+    "scripts": {
+      "type": "object",
+      "description": "脚本命令 / Script commands",
+      "additionalProperties": { "type": "string" }
+    },
+    "ohos": {
+      "type": "object",
+      "description": "OpenHarmony/HarmonyOS 特有配置",
+      "properties": {
+        "org": { "type": "string" }
+      }
+    }
+  }
+}

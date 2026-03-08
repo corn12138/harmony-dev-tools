@@ -1,0 +1,86 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicolo-ribaudo/tc39-proposal-scope-mapping/refs/heads/main/vscode/tmlanguage.schema.json",
+  "name": "ArkTS",
+  "scopeName": "source.arkts",
+  "patterns": [
+    { "include": "#arkts-decorators" },
+    { "include": "#arkts-struct" },
+    { "include": "#arkts-builder-function" },
+    { "include": "source.ts" }
+  ],
+  "repository": {
+    "arkts-decorators": {
+      "patterns": [
+        {
+          "name": "meta.decorator.arkts",
+          "match": "@(Component|Entry|CustomDialog|Builder|BuilderParam|Reusable|Preview)\\b",
+          "captures": {
+            "0": { "name": "entity.name.function.decorator.arkts" }
+          }
+        },
+        {
+          "name": "meta.decorator.state.arkts",
+          "match": "@(State|Prop|Link|Provide|Consume|Watch|Observed|ObjectLink|ObservedV2|Trace)\\b",
+          "captures": {
+            "0": { "name": "entity.name.function.decorator.arkts" }
+          }
+        },
+        {
+          "name": "meta.decorator.style.arkts",
+          "match": "@(Styles|Extend|AnimatableExtend)\\b",
+          "captures": {
+            "0": { "name": "entity.name.function.decorator.arkts" }
+          }
+        },
+        {
+          "name": "meta.decorator.concurrent.arkts",
+          "match": "@(Concurrent|Sendable)\\b",
+          "captures": {
+            "0": { "name": "entity.name.function.decorator.arkts" }
+          }
+        }
+      ]
+    },
+    "arkts-struct": {
+      "name": "meta.struct.arkts",
+      "begin": "\\b(struct)\\s+([A-Z]\\w*)",
+      "beginCaptures": {
+        "1": { "name": "keyword.other.struct.arkts" },
+        "2": { "name": "entity.name.type.struct.arkts" }
+      },
+      "end": "(?<=\\})",
+      "patterns": [
+        { "include": "#arkts-build-method" },
+        { "include": "source.ts" }
+      ]
+    },
+    "arkts-build-method": {
+      "name": "meta.method.build.arkts",
+      "begin": "\\b(build)\\s*\\(\\s*\\)",
+      "beginCaptures": {
+        "1": { "name": "entity.name.function.build.arkts" }
+      },
+      "end": "(?<=\\})",
+      "patterns": [
+        { "include": "#arkui-component-call" },
+        { "include": "#arkts-resource-reference" },
+        { "include": "source.ts" }
+      ]
+    },
+    "arkui-component-call": {
+      "name": "meta.component-call.arkui",
+      "match": "\\b(Column|Row|Stack|Flex|Grid|GridItem|List|ListItem|Scroll|Tabs|TabContent|Swiper|Navigation|NavRouter|NavDestination|Text|Span|Button|Image|TextInput|TextArea|Toggle|Radio|Checkbox|Select|Slider|Progress|LoadingProgress|Divider|Blank|Search|Rating|Stepper|StepperItem|Badge|Marquee|Counter|DatePicker|TimePicker|AlphabetIndexer|Panel|Refresh|WaterFlow|FlowItem|RelativeContainer|SideBarContainer|Web|RichText|Video|ForEach|LazyForEach|if|else)\\s*\\(",
+      "captures": {
+        "1": { "name": "entity.name.tag.component.arkui" }
+      }
+    },
+    "arkts-resource-reference": {
+      "name": "meta.resource-reference.arkts",
+      "match": "\\$r\\s*\\(\\s*['\"]([^'\"]+)['\"]\\s*\\)",
+      "captures": {
+        "0": { "name": "string.interpolated.resource.arkts" },
+        "1": { "name": "variable.other.resource.arkts" }
+      }
+    }
+  }
+}

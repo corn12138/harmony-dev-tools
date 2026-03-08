@@ -1,0 +1,438 @@
+{
+  "name": "harmony-dev-tools",
+  "displayName": "HarmonyOS Dev Tools",
+  "description": "Lightweight & powerful HarmonyOS development toolkit for VS Code",
+  "version": "0.1.0",
+  "publisher": "harmony-dev-tools",
+  "license": "MIT",
+  "icon": "resources/icons/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/corn12138/harmony-dev-tools"
+  },
+  "homepage": "https://github.com/corn12138/harmony-dev-tools#readme",
+  "bugs": {
+    "url": "https://github.com/corn12138/harmony-dev-tools/issues"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Linters",
+    "Debuggers"
+  ],
+  "keywords": [
+    "HarmonyOS",
+    "ArkTS",
+    "ArkUI",
+    "OpenHarmony",
+    "鸿蒙",
+    "ets"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/build-profile.json5"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "arkts",
+        "aliases": [
+          "ArkTS",
+          "arkts",
+          "ETS"
+        ],
+        "extensions": [
+          ".ets"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./resources/icons/arkts-light.svg",
+          "dark": "./resources/icons/arkts-dark.svg"
+        }
+      }
+    ],
+    "grammars": [
+      {
+        "language": "arkts",
+        "scopeName": "source.arkts",
+        "path": "./syntaxes/arkts.tmLanguage.json",
+        "embeddedLanguages": {
+          "meta.embedded.block.typescript": "typescript"
+        }
+      }
+    ],
+    "snippets": [
+      {
+        "language": "arkts",
+        "path": "./snippets/arkts.snippets.json"
+      }
+    ],
+    "jsonValidation": [
+      {
+        "fileMatch": "**/build-profile.json5",
+        "url": "./schemas/build-profile.schema.json"
+      },
+      {
+        "fileMatch": "**/oh-package.json5",
+        "url": "./schemas/oh-package.schema.json"
+      },
+      {
+        "fileMatch": "**/module.json5",
+        "url": "./schemas/module.schema.json"
+      },
+      {
+        "fileMatch": "**/AppScope/app.json5",
+        "url": "./schemas/app.schema.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "harmony.createProject",
+        "title": "Create New Project",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.buildHap",
+        "title": "Build HAP",
+        "category": "HarmonyOS",
+        "icon": "$(play)"
+      },
+      {
+        "command": "harmony.runOnDevice",
+        "title": "Run on Device",
+        "category": "HarmonyOS",
+        "icon": "$(debug-start)"
+      },
+      {
+        "command": "harmony.clean",
+        "title": "Clean Build",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.viewDevices",
+        "title": "Refresh Devices",
+        "category": "HarmonyOS",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "harmony.installHap",
+        "title": "Install HAP to Device",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.viewLogs",
+        "title": "View Device Logs",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.previewComponent",
+        "title": "Preview Component",
+        "category": "HarmonyOS",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "harmony.formatDocument",
+        "title": "Format ArkTS File",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.organizeImports",
+        "title": "Organize Imports",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.extractComponent",
+        "title": "Extract to @Component",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.extractBuilder",
+        "title": "Extract to @Builder",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.extractString",
+        "title": "Extract to $r() Resource",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.manageDeps",
+        "title": "Manage Dependencies",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.openDocs",
+        "title": "Search HarmonyOS Docs",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.uiInspector",
+        "title": "Open UI Inspector",
+        "category": "HarmonyOS",
+        "icon": "$(inspect)"
+      },
+      {
+        "command": "harmony.takeScreenshot",
+        "title": "Take Device Screenshot",
+        "category": "HarmonyOS",
+        "icon": "$(device-camera)"
+      },
+      {
+        "command": "harmony.buildAndRun",
+        "title": "Build & Run on Device",
+        "category": "HarmonyOS",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "harmony.terminalBuildAndRun",
+        "title": "Build & Run (Terminal)",
+        "category": "HarmonyOS",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "harmony.stopApp",
+        "title": "Stop App on Device",
+        "category": "HarmonyOS",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "harmony.debugApp",
+        "title": "Debug App on Device",
+        "category": "HarmonyOS",
+        "icon": "$(debug-alt)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "harmony-explorer",
+          "title": "HarmonyOS",
+          "icon": "resources/icons/harmony.svg"
+        }
+      ]
+    },
+    "views": {
+      "harmony-explorer": [
+        {
+          "id": "harmony.projectView",
+          "name": "Project",
+          "when": "harmony.isHarmonyProject"
+        },
+        {
+          "id": "harmony.deviceView",
+          "name": "Devices",
+          "when": "harmony.isHarmonyProject"
+        },
+        {
+          "id": "harmony.resourceView",
+          "name": "Resources",
+          "when": "harmony.isHarmonyProject"
+        }
+      ]
+    },
+    "menus": {
+      "editor/context": [
+        {
+          "command": "harmony.extractComponent",
+          "when": "editorLangId == arkts",
+          "group": "1_modification"
+        },
+        {
+          "command": "harmony.extractBuilder",
+          "when": "editorLangId == arkts",
+          "group": "1_modification"
+        },
+        {
+          "command": "harmony.extractString",
+          "when": "editorLangId == arkts",
+          "group": "1_modification"
+        },
+        {
+          "command": "harmony.previewComponent",
+          "when": "editorLangId == arkts",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "harmony.buildHap",
+          "when": "harmony.isHarmonyProject",
+          "group": "navigation"
+        },
+        {
+          "command": "harmony.runOnDevice",
+          "when": "harmony.isHarmonyProject",
+          "group": "navigation"
+        },
+        {
+          "command": "harmony.buildAndRun",
+          "when": "harmony.isHarmonyProject",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "harmony.viewDevices",
+          "when": "view == harmony.deviceView",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "HarmonyOS Dev Tools",
+      "properties": {
+        "harmony.sdkPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to HarmonyOS/OpenHarmony SDK root directory"
+        },
+        "harmony.hdcPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to HDC executable (auto-detected if empty)"
+        },
+        "harmony.autoFormatOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Auto format ArkTS files on save"
+        },
+        "harmony.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show component references and route info as CodeLens"
+        },
+        "harmony.enableInlayHints": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show inline type hints for ArkUI components"
+        },
+        "harmony.enableResourceValidation": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate $r() resource references"
+        },
+        "harmony.logLevel": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "default": "info",
+          "description": "Extension log level"
+        },
+        "harmony.devicePollInterval": {
+          "type": "number",
+          "default": 5000,
+          "minimum": 1000,
+          "description": "Device list refresh interval in milliseconds"
+        }
+      }
+    },
+    "taskDefinitions": [
+      {
+        "type": "hvigor",
+        "required": [
+          "task"
+        ],
+        "properties": {
+          "task": {
+            "type": "string",
+            "description": "The hvigor task to run"
+          },
+          "module": {
+            "type": "string",
+            "description": "Target module name"
+          }
+        }
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "harmonyos",
+        "label": "HarmonyOS Debug",
+        "languages": ["arkts"],
+        "configurationAttributes": {
+          "launch": {
+            "required": [],
+            "properties": {
+              "bundleName": {
+                "type": "string",
+                "description": "App bundle name (auto-detected from app.json5 if empty)",
+                "default": ""
+              },
+              "abilityName": {
+                "type": "string",
+                "description": "Entry ability name",
+                "default": "EntryAbility"
+              },
+              "deviceId": {
+                "type": "string",
+                "description": "Target device ID (auto-selected if empty)",
+                "default": ""
+              },
+              "debugPort": {
+                "type": "number",
+                "description": "Debug port for CDP connection",
+                "default": 9230
+              }
+            }
+          }
+        },
+        "configurationSnippets": [
+          {
+            "label": "HarmonyOS: Debug App",
+            "description": "Launch and debug a HarmonyOS application",
+            "body": {
+              "type": "harmonyos",
+              "request": "launch",
+              "name": "Debug HarmonyOS App",
+              "bundleName": "",
+              "abilityName": "EntryAbility",
+              "debugPort": 9230
+            }
+          }
+        ]
+      }
+    ],
+    "problemMatchers": [
+      {
+        "name": "hvigor",
+        "owner": "arkts",
+        "fileLocation": [
+          "relative",
+          "${workspaceFolder}"
+        ],
+        "pattern": {
+          "regexp": "^(.+):(\\d+):(\\d+):\\s+(error|warning):\\s+(.+)$",
+          "file": 1,
+          "line": 2,
+          "column": 3,
+          "severity": 4,
+          "message": 5
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --outdir=dist --external:vscode --format=cjs --platform=node --target=es2022 --sourcemap",
+    "build:prod": "pnpm build --minify --tree-shaking=true",
+    "watch": "pnpm build --watch",
+    "lint": "eslint src --ext ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "package": "vsce package --no-dependencies",
+    "publish": "vsce publish --no-dependencies",
+    "size-check": "node scripts/size-check.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.9.3"
+  }
+}

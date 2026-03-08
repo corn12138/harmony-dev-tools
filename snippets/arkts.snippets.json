@@ -1,0 +1,497 @@
+{
+  "Entry Component": {
+    "prefix": "entry",
+    "body": [
+      "@Entry",
+      "@Component",
+      "struct ${1:PageName} {",
+      "  @State message: string = '${2:Hello World}';",
+      "",
+      "  build() {",
+      "    Column() {",
+      "      Text(this.message)",
+      "        .fontSize(24)",
+      "        .fontWeight(FontWeight.Bold)",
+      "      $0",
+      "    }",
+      "    .width('100%')",
+      "    .height('100%')",
+      "    .justifyContent(FlexAlign.Center)",
+      "  }",
+      "}"
+    ],
+    "description": "Create an @Entry @Component page"
+  },
+  "Component": {
+    "prefix": "comp",
+    "body": [
+      "@Component",
+      "struct ${1:ComponentName} {",
+      "  $2",
+      "",
+      "  build() {",
+      "    ${3:Column}() {",
+      "      $0",
+      "    }",
+      "  }",
+      "}"
+    ],
+    "description": "Create a @Component struct"
+  },
+  "Column Layout": {
+    "prefix": "col",
+    "body": [
+      "Column(${1:{ space: 12 \\}}) {",
+      "  $0",
+      "}",
+      ".width('${2:100%}')",
+      ".alignItems(HorizontalAlign.${3:Center})"
+    ],
+    "description": "Column layout container"
+  },
+  "Row Layout": {
+    "prefix": "row",
+    "body": [
+      "Row(${1:{ space: 8 \\}}) {",
+      "  $0",
+      "}",
+      ".width('${2:100%}')",
+      ".justifyContent(FlexAlign.${3:SpaceBetween})"
+    ],
+    "description": "Row layout container"
+  },
+  "Stack Layout": {
+    "prefix": "stack",
+    "body": [
+      "Stack({ alignContent: Alignment.${1:Center} }) {",
+      "  $0",
+      "}"
+    ],
+    "description": "Stack layout container"
+  },
+  "Text": {
+    "prefix": "txt",
+    "body": [
+      "Text(${1:'Hello'})",
+      "  .fontSize(${2:16})",
+      "  .fontColor(${3:'#333333'})",
+      "  .fontWeight(FontWeight.${4:Normal})"
+    ],
+    "description": "Text component"
+  },
+  "Button": {
+    "prefix": "btn",
+    "body": [
+      "Button('${1:Click Me}')",
+      "  .width(${2:200})",
+      "  .height(${3:40})",
+      "  .onClick(() => {",
+      "    $0",
+      "  })"
+    ],
+    "description": "Button component with onClick"
+  },
+  "Image": {
+    "prefix": "img",
+    "body": [
+      "Image(\\$r('app.media.${1:icon}'))",
+      "  .width(${2:100})",
+      "  .height(${3:100})",
+      "  .objectFit(ImageFit.${4:Contain})"
+    ],
+    "description": "Image component"
+  },
+  "TextInput": {
+    "prefix": "input",
+    "body": [
+      "TextInput({ placeholder: '${1:Enter text}', text: this.${2:inputValue} })",
+      "  .width('${3:100%}')",
+      "  .height(${4:40})",
+      "  .onChange((value: string) => {",
+      "    this.${2:inputValue} = value;",
+      "  })"
+    ],
+    "description": "TextInput component"
+  },
+  "List": {
+    "prefix": "list",
+    "body": [
+      "List({ space: ${1:12} }) {",
+      "  ForEach(this.${2:items}, (item: ${3:string}, index: number) => {",
+      "    ListItem() {",
+      "      ${4:Text(item)}",
+      "    }",
+      "  })",
+      "}",
+      ".width('100%')",
+      ".layoutWeight(1)"
+    ],
+    "description": "List with ForEach"
+  },
+  "Grid": {
+    "prefix": "grid",
+    "body": [
+      "Grid() {",
+      "  ForEach(this.${1:items}, (item: ${2:string}) => {",
+      "    GridItem() {",
+      "      $0",
+      "    }",
+      "  })",
+      "}",
+      ".columnsTemplate('${3:1fr 1fr}')",
+      ".rowsGap(${4:12})",
+      ".columnsGap(${5:12})"
+    ],
+    "description": "Grid layout"
+  },
+  "Tabs": {
+    "prefix": "tabs",
+    "body": [
+      "Tabs({ barPosition: BarPosition.${1:End} }) {",
+      "  TabContent() {",
+      "    ${2:Text('Tab 1')}",
+      "  }.tabBar('${3:Home}')",
+      "",
+      "  TabContent() {",
+      "    ${4:Text('Tab 2')}",
+      "  }.tabBar('${5:Profile}')",
+      "}",
+      ".barWidth('100%')"
+    ],
+    "description": "Tabs navigation"
+  },
+  "Swiper": {
+    "prefix": "swiper",
+    "body": [
+      "Swiper() {",
+      "  ForEach(this.${1:banners}, (item: ${2:string}) => {",
+      "    Image(item)",
+      "      .width('100%')",
+      "      .height(${3:200})",
+      "  })",
+      "}",
+      ".autoPlay(${4:true})",
+      ".interval(${5:3000})",
+      ".indicator(true)"
+    ],
+    "description": "Swiper/Carousel component"
+  },
+  "Navigation": {
+    "prefix": "nav",
+    "body": [
+      "Navigation() {",
+      "  $0",
+      "}",
+      ".title('${1:Page Title}')",
+      ".titleMode(NavigationTitleMode.${2:Mini})"
+    ],
+    "description": "Navigation container"
+  },
+  "Scroll": {
+    "prefix": "scroll",
+    "body": [
+      "Scroll() {",
+      "  Column() {",
+      "    $0",
+      "  }",
+      "}",
+      ".scrollable(ScrollDirection.${1:Vertical})",
+      ".scrollBar(BarState.${2:Auto})"
+    ],
+    "description": "Scroll container"
+  },
+  "CustomDialog": {
+    "prefix": "dialog",
+    "body": [
+      "@CustomDialog",
+      "struct ${1:MyDialog} {",
+      "  controller: CustomDialogController;",
+      "",
+      "  build() {",
+      "    Column({ space: 16 }) {",
+      "      Text('${2:Dialog Title}')",
+      "        .fontSize(20)",
+      "        .fontWeight(FontWeight.Bold)",
+      "      Text('${3:Dialog content}')",
+      "        .fontSize(16)",
+      "      Row({ space: 16 }) {",
+      "        Button('Cancel')",
+      "          .onClick(() => this.controller.close())",
+      "        Button('Confirm')",
+      "          .onClick(() => {",
+      "            $0",
+      "            this.controller.close();",
+      "          })",
+      "      }",
+      "    }",
+      "    .padding(24)",
+      "  }",
+      "}"
+    ],
+    "description": "Custom dialog component"
+  },
+  "@Builder Function": {
+    "prefix": "builder",
+    "body": [
+      "@Builder",
+      "${1:builderName}(${2}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "@Builder reusable UI function"
+  },
+  "@State Variable": {
+    "prefix": "state",
+    "body": "@State ${1:name}: ${2:string} = ${3:''};",
+    "description": "@State reactive variable"
+  },
+  "@Prop Variable": {
+    "prefix": "prop",
+    "body": "@Prop ${1:name}: ${2:string};",
+    "description": "@Prop one-way binding variable"
+  },
+  "@Link Variable": {
+    "prefix": "link",
+    "body": "@Link ${1:name}: ${2:string};",
+    "description": "@Link two-way binding variable"
+  },
+  "@Provide Variable": {
+    "prefix": "provide",
+    "body": "@Provide ${1:name}: ${2:string} = ${3:''};",
+    "description": "@Provide ancestor data"
+  },
+  "@Consume Variable": {
+    "prefix": "consume",
+    "body": "@Consume ${1:name}: ${2:string};",
+    "description": "@Consume descendant data"
+  },
+  "@Watch Handler": {
+    "prefix": "watch",
+    "body": [
+      "@Watch('${1:onValueChange}')",
+      "@State ${2:value}: ${3:string} = ${4:''};",
+      "",
+      "${1:onValueChange}(): void {",
+      "  $0",
+      "}"
+    ],
+    "description": "@Watch state change observer"
+  },
+  "aboutToAppear": {
+    "prefix": "appear",
+    "body": [
+      "aboutToAppear(): void {",
+      "  $0",
+      "}"
+    ],
+    "description": "Lifecycle: before component appears"
+  },
+  "aboutToDisappear": {
+    "prefix": "disappear",
+    "body": [
+      "aboutToDisappear(): void {",
+      "  $0",
+      "}"
+    ],
+    "description": "Lifecycle: before component is destroyed"
+  },
+  "onPageShow": {
+    "prefix": "pageshow",
+    "body": [
+      "onPageShow(): void {",
+      "  $0",
+      "}"
+    ],
+    "description": "Lifecycle: page shown (Entry only)"
+  },
+  "onBackPress": {
+    "prefix": "backpress",
+    "body": [
+      "onBackPress(): boolean {",
+      "  $0",
+      "  return ${1:false};",
+      "}"
+    ],
+    "description": "Lifecycle: back button pressed (Entry only)"
+  },
+  "HTTP Request": {
+    "prefix": "http",
+    "body": [
+      "import http from '@ohos.net.http';",
+      "",
+      "const httpRequest = http.createHttp();",
+      "httpRequest.request(",
+      "  '${1:https://api.example.com/data}',",
+      "  {",
+      "    method: http.RequestMethod.${2:GET},",
+      "    header: { 'Content-Type': 'application/json' },",
+      "    ${3:extraData: JSON.stringify(\\{\\}),}",
+      "  },",
+      "  (err, data) => {",
+      "    if (!err) {",
+      "      const result = JSON.parse(data.result as string);",
+      "      $0",
+      "    }",
+      "    httpRequest.destroy();",
+      "  }",
+      ");"
+    ],
+    "description": "HTTP network request"
+  },
+  "Preferences Storage": {
+    "prefix": "prefs",
+    "body": [
+      "import dataPreferences from '@ohos.data.preferences';",
+      "",
+      "const PREFS_NAME = '${1:myPrefs}';",
+      "",
+      "async ${2:saveData}(context: Context): Promise<void> {",
+      "  const prefs = await dataPreferences.getPreferences(context, PREFS_NAME);",
+      "  await prefs.put('${3:key}', ${4:val});",
+      "  await prefs.flush();",
+      "}",
+      "",
+      "async ${5:loadData}(context: Context): Promise<${6:string}> {",
+      "  const prefs = await dataPreferences.getPreferences(context, PREFS_NAME);",
+      "  return await prefs.get('${3:key}', ${7:''}) as ${6:string};",
+      "}"
+    ],
+    "description": "Data Preferences read/write"
+  },
+  "Router Push": {
+    "prefix": "push",
+    "body": [
+      "import router from '@ohos.router';",
+      "",
+      "router.pushUrl({",
+      "  url: 'pages/${1:PageName}',",
+      "  params: { ${2:key}: ${3:val} }",
+      "}).catch((err: Error) => {",
+      "  console.error('Router push failed:', err.message);",
+      "});"
+    ],
+    "description": "Router navigation push"
+  },
+  "Animation": {
+    "prefix": "animate",
+    "body": [
+      "animateTo({",
+      "  duration: ${1:300},",
+      "  curve: Curve.${2:EaseInOut},",
+      "  onFinish: () => {",
+      "    $3",
+      "  }",
+      "}, () => {",
+      "  $0",
+      "});"
+    ],
+    "description": "animateTo animation block"
+  },
+  "Transition": {
+    "prefix": "trans",
+    "body": [
+      ".transition({",
+      "  type: TransitionType.${1:Insert},",
+      "  opacity: ${2:0},",
+      "  translate: { x: ${3:0}, y: ${4:0} }",
+      "})"
+    ],
+    "description": "Component transition effect"
+  },
+  "Permission Request": {
+    "prefix": "perm",
+    "body": [
+      "import abilityAccessCtrl from '@ohos.abilityAccessCtrl';",
+      "import bundleManager from '@ohos.bundle.bundleManager';",
+      "",
+      "async function requestPermission(context: Context): Promise<boolean> {",
+      "  const atManager = abilityAccessCtrl.createAtManager();",
+      "  const bundleInfo = await bundleManager.getBundleInfoForSelf(",
+      "    bundleManager.BundleFlag.GET_BUNDLE_INFO_WITH_APPLICATION",
+      "  );",
+      "  const result = await atManager.requestPermissionsFromUser(",
+      "    context,",
+      "    ['${1:ohos.permission.CAMERA}']",
+      "  );",
+      "  return result.authResults.every(r => r === 0);",
+      "}"
+    ],
+    "description": "Dynamic permission request"
+  },
+  "ForEach": {
+    "prefix": "foreach",
+    "body": [
+      "ForEach(this.${1:items}, (item: ${2:string}, index: number) => {",
+      "  $0",
+      "}, (item: ${2:string}) => JSON.stringify(item))"
+    ],
+    "description": "ForEach loop in build"
+  },
+  "LazyForEach": {
+    "prefix": "lazyforeach",
+    "body": [
+      "LazyForEach(this.${1:dataSource}, (item: ${2:string}, index: number) => {",
+      "  $0",
+      "}, (item: ${2:string}) => JSON.stringify(item))"
+    ],
+    "description": "LazyForEach for large lists"
+  },
+  "if-else UI": {
+    "prefix": "ifui",
+    "body": [
+      "if (this.${1:condition}) {",
+      "  $2",
+      "} else {",
+      "  $3",
+      "}"
+    ],
+    "description": "Conditional rendering in build"
+  },
+  "Refresh Pull Down": {
+    "prefix": "refresh",
+    "body": [
+      "Refresh({ refreshing: \\$\\$this.${1:isRefreshing} }) {",
+      "  $0",
+      "}",
+      ".onRefreshing(() => {",
+      "  setTimeout(() => {",
+      "    this.${1:isRefreshing} = false;",
+      "  }, ${2:2000});",
+      "})"
+    ],
+    "description": "Pull-down refresh container"
+  },
+  "onClick Event": {
+    "prefix": "click",
+    "body": [
+      ".onClick((event?: ClickEvent) => {",
+      "  $0",
+      "})"
+    ],
+    "description": "onClick event handler"
+  },
+  "@Styles Decorator": {
+    "prefix": "styles",
+    "body": [
+      "@Styles",
+      "${1:myStyles}() {",
+      "  .width('${2:100%}')",
+      "  .padding(${3:12})",
+      "  .backgroundColor(${4:'#FFFFFF'})",
+      "}"
+    ],
+    "description": "@Styles reusable style function"
+  },
+  "@Extend Decorator": {
+    "prefix": "extend",
+    "body": [
+      "@Extend(${1:Text})",
+      "function ${2:fancy}(${3}) {",
+      "  .fontSize(${4:24})",
+      "  .fontColor(${5:'#FF0000'})",
+      "  .fontWeight(FontWeight.${6:Bold})",
+      "}"
+    ],
+    "description": "@Extend component attribute extension"
+  }
+}

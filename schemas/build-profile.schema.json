@@ -1,0 +1,71 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HarmonyOS Build Profile",
+  "description": "HarmonyOS 构建配置文件 / Build configuration file",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "object",
+      "description": "应用级构建配置 / Application-level build configuration",
+      "properties": {
+        "signingConfigs": {
+          "type": "array",
+          "description": "签名配置列表 / Signing configurations",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "签名配置名称 / Signing config name" },
+              "type": { "type": "string", "enum": ["HarmonyOS", "OpenHarmony"], "description": "签名类型" },
+              "material": {
+                "type": "object",
+                "properties": {
+                  "certpath": { "type": "string" },
+                  "storeFile": { "type": "string" },
+                  "signAlg": { "type": "string" },
+                  "profile": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "products": {
+          "type": "array",
+          "description": "产品配置列表 / Product configurations",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "产品名称 (default/free/paid)" },
+              "signingConfig": { "type": "string" },
+              "compatibleSdkVersion": { "type": ["string", "number"], "description": "最低兼容 SDK 版本" },
+              "compileSdkVersion": { "type": ["string", "number"], "description": "编译 SDK 版本" },
+              "runtimeOS": { "type": "string", "enum": ["HarmonyOS", "OpenHarmony"] }
+            },
+            "required": ["name"]
+          }
+        }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "description": "模块配置列表 / Module configurations",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "模块名称 / Module name" },
+          "srcPath": { "type": "string", "description": "源码路径 / Source path" },
+          "targets": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "applyToProducts": { "type": "array", "items": { "type": "string" } }
+              }
+            }
+          }
+        },
+        "required": ["name", "srcPath"]
+      }
+    }
+  }
+}

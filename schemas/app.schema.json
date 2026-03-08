@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "app.json5",
+  "description": "HarmonyOS 应用配置 / Application configuration",
+  "type": "object",
+  "properties": {
+    "app": {
+      "type": "object",
+      "description": "应用配置 / Application definition",
+      "properties": {
+        "bundleName": {
+          "type": "string",
+          "description": "应用包名 / Bundle name (e.g., 'com.example.myapp')",
+          "pattern": "^[a-z][a-z0-9]*(\\.[a-z][a-z0-9]*)+$"
+        },
+        "vendor": { "type": "string", "description": "开发者/厂商 / Vendor name" },
+        "versionCode": { "type": "integer", "description": "版本号 / Version code (integer, must increment)", "minimum": 1 },
+        "versionName": { "type": "string", "description": "版本名称 / Version name (e.g., '1.0.0')" },
+        "icon": { "type": "string", "description": "应用图标 / App icon resource reference" },
+        "label": { "type": "string", "description": "应用名称 / App label resource reference" },
+        "description": { "type": "string", "description": "应用描述" },
+        "minCompatibleVersionCode": { "type": "integer", "description": "最低兼容版本号" },
+        "minAPIVersion": { "type": "integer", "description": "最低 API 版本" },
+        "targetAPIVersion": { "type": "integer", "description": "目标 API 版本" },
+        "apiReleaseType": { "type": "string", "enum": ["CanaryN", "BetaN", "Release"], "description": "API 发行类型" }
+      },
+      "required": ["bundleName", "versionCode", "versionName"]
+    }
+  }
+}
