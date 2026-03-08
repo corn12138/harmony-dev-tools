@@ -10,6 +10,7 @@
 | [docs/部署发布.md](docs/部署发布.md) | 打包流程、发布到 Marketplace、GitHub 推送、完整发版流程 |
 | [docs/错误排查.md](docs/错误排查.md) | 13 个常见错误的原因和解决方案、快速诊断流程图 |
 | [docs/扩展规划.md](docs/扩展规划.md) | 短期/中期/长期规划、8 个扩展点使用指南、贡献指南 |
+| [docs/操作手册.md](docs/操作手册.md) | 全部 23 个命令操作指南、V2 迁移、API 兼容性检查 |
 
 ---
 
@@ -18,8 +19,8 @@
 | 项目 / Item | 详情 / Details |
 |-------------|---------------|
 | 名称 / Name | HarmonyOS Dev Tools |
-| 版本 / Version | 0.1.1 |
-| 包大小 / Package Size | 97 KB（19 files） |
+| 版本 / Version | 0.2.1 |
+| 包大小 / Package Size | ~130 KB |
 | GitHub | https://github.com/corn12138/harmony-dev-tools |
 | Marketplace Publisher | corn12138 |
 | 许可证 / License | MIT |

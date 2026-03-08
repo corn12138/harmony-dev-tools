@@ -31,6 +31,8 @@ export const COMMANDS = {
   TERMINAL_BUILD_RUN: 'harmony.terminalBuildAndRun',
   STOP_APP: 'harmony.stopApp',
   DEBUG_APP: 'harmony.debugApp',
+  MIGRATE_V1_TO_V2: 'harmony.migrateV1ToV2',
+  CHECK_API_COMPAT: 'harmony.checkApiCompat',
 } as const;
 
 export const CONTEXT_KEYS = {

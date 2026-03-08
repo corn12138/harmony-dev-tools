@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Lightweight & powerful HarmonyOS development toolkit for VS Code",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -210,6 +210,16 @@
         "title": "Debug App on Device",
         "category": "HarmonyOS",
         "icon": "$(debug-alt)"
+      },
+      {
+        "command": "harmony.migrateV1ToV2",
+        "title": "Migrate V1 → V2 Decorators",
+        "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.checkApiCompat",
+        "title": "Check API Compatibility",
+        "category": "HarmonyOS"
       }
     ],
     "viewsContainers": {
@@ -261,6 +271,11 @@
           "command": "harmony.previewComponent",
           "when": "editorLangId == arkts",
           "group": "navigation"
+        },
+        {
+          "command": "harmony.migrateV1ToV2",
+          "when": "editorLangId == arkts",
+          "group": "1_modification"
         }
       ],
       "editor/title": [

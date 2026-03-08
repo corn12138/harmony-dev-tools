@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.1] - 2026-03-08
+
+### Added
+- **V1 → V2 Migration Tool** (`HarmonyOS: Migrate V1 → V2 Decorators`):
+  - One-click migration: @Component→@ComponentV2, @State→@Local, @Prop→@Param, etc.
+  - V1/V2 mixing detection with user confirmation
+  - TODO comments for manual review where needed (@ObjectLink→@Param)
+- **API Compatibility Checker** (`HarmonyOS: Check API Compatibility`):
+  - Scans project for API version mismatches
+  - Detects V2 decorator usage against compileSdkVersion
+  - Validates hvigor-config.json5 modelVersion
+  - Reports V1/V2 mixing in same file
+  - Results output to "HarmonyOS Compatibility" channel
+- **Operation Manual** (`docs/操作手册.md`):
+  - Comprehensive user guide for all 23 commands
+  - V2 migration walkthrough and API compat check guide
+  - Keyboard shortcuts and troubleshooting
+
+### Changed
+- Both new commands added to right-click context menu for .ets files
+
 ## [0.2.0] - 2026-03-08
 
 ### Added

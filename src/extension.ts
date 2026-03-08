@@ -286,6 +286,16 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
     });
   });
 
+  lazyCommand(COMMANDS.MIGRATE_V1_TO_V2, async () => {
+    const { migrateV1ToV2 } = await import('./tools/codeActions');
+    await migrateV1ToV2();
+  });
+
+  lazyCommand(COMMANDS.CHECK_API_COMPAT, async () => {
+    const { checkApiCompatibility } = await import('./tools/apiCompatChecker');
+    await checkApiCompatibility();
+  });
+
   lazyCommand(COMMANDS.TAKE_SCREENSHOT, async () => {
     const { captureScreenshot } = await import('./debug/uiInspector');
     const base64 = await captureScreenshot();
