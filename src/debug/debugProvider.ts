@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { getHdcPath } from '../utils/config';
+import { resolveHdcPath } from '../utils/config';
 import { CONFIG_FILES } from '../utils/constants';
 
 const execAsync = promisify(exec);
@@ -107,7 +107,7 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
   }
 
   private async handleLaunch(reqSeq: number): Promise<void> {
-    const hdc = getHdcPath() || 'hdc';
+    const hdc = await resolveHdcPath();
     const port = this.config.debugPort || 9230;
     const deviceId = this.config.deviceId || '';
     const target = deviceId ? `-t ${deviceId}` : '';
@@ -186,7 +186,7 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
 
   private async handleDisconnect(reqSeq: number): Promise<void> {
     // Clean up port forwarding
-    const hdc = getHdcPath() || 'hdc';
+    const hdc = await resolveHdcPath();
     const port = this.config.debugPort || 9230;
     const deviceId = this.config.deviceId || '';
     const target = deviceId ? `-t ${deviceId}` : '';

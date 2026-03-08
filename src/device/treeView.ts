@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getHdcPath } from '../utils/config';
+import { resolveHdcPath } from '../utils/config';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -24,7 +24,7 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<DeviceItem>, 
   }
 
   async refresh(): Promise<void> {
-    const hdc = getHdcPath() || 'hdc';
+    const hdc = await resolveHdcPath();
     try {
       const { stdout } = await execAsync(`${hdc} list targets`, { timeout: 3000 });
       this.devices = stdout.trim().split('\n')

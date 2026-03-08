@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getHdcPath } from '../utils/config';
+import { resolveHdcPath } from '../utils/config';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 
@@ -11,7 +11,7 @@ interface Device {
 }
 
 async function getHdc(): Promise<string> {
-  return getHdcPath() || 'hdc';
+  return resolveHdcPath();
 }
 
 async function listDevices(): Promise<Device[]> {

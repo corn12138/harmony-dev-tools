@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { getHdcPath } from '../utils/config';
+import { resolveHdcPath } from '../utils/config';
 import { CONFIG_FILES } from '../utils/constants';
 
 let buildTerminal: vscode.Terminal | undefined;
@@ -16,7 +16,7 @@ export async function terminalBuildAndRun(): Promise<void> {
   }
 
   const rootPath = folder.uri.fsPath;
-  const hdc = getHdcPath() || 'hdc';
+  const hdc = await resolveHdcPath();
 
   // Read project info for launch command
   const bundleName = await readBundleName(rootPath);
@@ -83,7 +83,7 @@ export async function terminalRunOnly(): Promise<void> {
   if (!folder) return;
 
   const rootPath = folder.uri.fsPath;
-  const hdc = getHdcPath() || 'hdc';
+  const hdc = await resolveHdcPath();
   const bundleName = await readBundleName(rootPath);
   const abilityName = await readEntryAbility(rootPath) || 'EntryAbility';
 
@@ -109,7 +109,7 @@ export async function terminalStopApp(): Promise<void> {
   if (!folder) return;
 
   const rootPath = folder.uri.fsPath;
-  const hdc = getHdcPath() || 'hdc';
+  const hdc = await resolveHdcPath();
   const bundleName = await readBundleName(rootPath);
 
   if (!bundleName) return;

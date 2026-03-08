@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getHdcPath } from '../utils/config';
+import { resolveHdcPath } from '../utils/config';
 
 const execAsync = promisify(exec);
 
@@ -21,7 +21,7 @@ export interface UINode {
  * ArkUI inspector protocol when available.
  */
 export async function dumpUITree(deviceId?: string): Promise<UINode | null> {
-  const hdc = getHdcPath() || 'hdc';
+  const hdc = await resolveHdcPath();
   const target = deviceId ? `-t ${deviceId}` : '';
 
   try {
@@ -48,7 +48,7 @@ export async function dumpUITree(deviceId?: string): Promise<UINode | null> {
 
 /** Take a screenshot from device and return base64 PNG */
 export async function captureScreenshot(deviceId?: string): Promise<string | null> {
-  const hdc = getHdcPath() || 'hdc';
+  const hdc = await resolveHdcPath();
   const target = deviceId ? `-t ${deviceId}` : '';
   const tmpDevice = '/data/local/tmp/screenshot.png';
   const tmpLocal = `/tmp/harmony_screenshot_${Date.now()}.png`;

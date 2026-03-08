@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { getHdcPath } from '../utils/config';
+import { resolveHdcPath, promptHdcConfiguration } from '../utils/config';
 import { CONFIG_FILES } from '../utils/constants';
 
 const execAsync = promisify(exec);
@@ -24,7 +24,7 @@ export async function buildAndRun(options: BuildAndRunOptions = {}): Promise<voi
   const rootPath = folder.uri.fsPath;
 
   // Step 1: Check device
-  const hdc = getHdcPath() || 'hdc';
+  const hdc = await resolveHdcPath();
   const device = await selectDevice(hdc);
   if (!device) return;
 
@@ -75,7 +75,12 @@ async function selectDevice(hdc: string): Promise<string | null> {
     );
     return picked?.label ?? null;
   } catch {
-    vscode.window.showErrorMessage('Failed to list devices. Is HDC installed and in PATH?');
+    // HDC command failed — offer to configure it
+    const configured = await promptHdcConfiguration();
+    if (configured) {
+      // Retry with the newly configured path
+      return selectDevice(configured);
+    }
     return null;
   }
 }
