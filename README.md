@@ -10,9 +10,9 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
 
 ### Language Support / 语言支持
 - **ArkTS syntax highlighting / ArkTS 语法高亮** — for `.ets` files / 适用于 `.ets` 文件
-- **40+ code snippets / 40+ 代码片段** — type `comp`, `entry`, `col`, `row`, `btn`, `state`, etc. / 输入 `comp`、`entry`、`col`、`row`、`btn`、`state` 等触发
-- **Auto-completion / 自动补全** — decorators (`@Component`, `@State`, `@Link`...), ArkUI components (40+), and lifecycle methods / 装饰器、ArkUI 组件（40+）、生命周期方法
-- **Hover documentation / 悬浮文档** — for all ArkTS decorators / 所有 ArkTS 装饰器
+- **55+ code snippets / 55+ 代码片段** — type `comp`, `entry`, `col`, `row`, `btn`, `state`, `compv2`, `local`, `param`, `monitor`, etc. / 输入 `comp`、`entry`、`compv2`、`local`、`param`、`monitor` 等触发
+- **Auto-completion / 自动补全** — decorators (`@Component`, `@State`, `@ComponentV2`, `@Local`...), ArkUI components (70+), and lifecycle methods / 装饰器（V1+V2）、ArkUI 组件（70+）、生命周期方法
+- **Hover documentation / 悬浮文档** — bilingual docs for 30+ ArkTS decorators (V1 & V2) / 30+ 装饰器中英文悬浮文档（V1 & V2）
 - **CodeLens** — showing component references and `@Entry` route info / 显示组件引用计数和 `@Entry` 路由信息
 - **Color preview / 颜色预览** — hex colors (`#RRGGBB`, `#AARRGGBB`) and named colors (`Color.Red`) / 十六进制颜色和命名颜色
 
@@ -21,11 +21,26 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
 - **Ctrl+Click navigation / Ctrl+Click 跳转** — jump from `$r('app.string.title')` to the resource definition / 从 `$r('app.string.title')` 跳转到资源定义
 - **Resource validation / 资源校验** — diagnostics for missing or invalid resource references / 检测缺失或无效的资源引用
 
+### HarmonyOS NEXT / V2 State Management / V2 状态管理
+
+> **NEW in v0.2.0+** — Full support for HarmonyOS NEXT (API 12+) V2 decorators.
+> **v0.2.0+ 新增** — 全面支持 HarmonyOS NEXT（API 12+）V2 装饰器。
+
+- **V2 Decorator support / V2 装饰器支持** — `@ComponentV2`, `@Local`, `@Param`, `@Once`, `@Event`, `@Monitor`, `@Computed`, `@ObservedV2`, `@Trace`, `@Provider`, `@Consumer`
+- **V1 → V2 Migration / V1 → V2 迁移** — run `HarmonyOS: Migrate V1 → V2 Decorators` to one-click migrate decorators in the current file / 运行命令一键迁移当前文件中的装饰器
+  - `@Component` → `@ComponentV2`, `@State` → `@Local`, `@Prop` → `@Param`, `@Provide` → `@Provider`, `@Consume` → `@Consumer`, `@Watch` → `@Monitor`, `@Observed` → `@ObservedV2`
+  - Detects V1/V2 mixing and warns before proceeding / 检测 V1/V2 混用并在执行前警告
+- **API Compatibility Check / API 兼容性检查** — run `HarmonyOS: Check API Compatibility` to scan your project for version mismatches / 运行命令扫描项目中的版本兼容问题
+  - Validates V2 decorator usage against `compileSdkVersion` / 检查 V2 装饰器使用是否匹配编译 SDK 版本
+  - Checks `hvigor-config.json5` `modelVersion` / 检查 hvigor 配置版本
+  - Reports V1/V2 mixing in same file / 报告同文件 V1/V2 混用
+
 ### JSON Schema Validation / JSON Schema 校验
 - `build-profile.json5` — build configuration / 构建配置
 - `oh-package.json5` — package dependencies / 包依赖
 - `module.json5` — module configuration / 模块配置
 - `app.json5` — application metadata / 应用元数据
+- `hvigor-config.json5` — hvigor build tool configuration / hvigor 构建工具配置
 
 ### Build & Run / 构建与运行
 
@@ -97,6 +112,8 @@ Run `HarmonyOS: View Device Logs` to stream `hdc hilog` output to VS Code's Outp
   - Extract to `@Component` — extract selected UI code to a new component / 提取选中 UI 代码为新组件
   - Extract to `@Builder` — extract to a `@Builder` method / 提取为 `@Builder` 方法
   - Extract to `$r()` — extract hardcoded strings to resource references / 提取硬编码字符串为资源引用
+- `HarmonyOS: Migrate V1 → V2 Decorators` — one-click decorator migration (also in right-click menu) / 一键装饰器迁移（右键菜单可用）
+- `HarmonyOS: Check API Compatibility` — scan project for API version mismatches / 扫描项目 API 版本兼容问题
 - `HarmonyOS: Organize Imports` — organize import statements / 整理导入语句
 - `HarmonyOS: Format ArkTS File` — format current file / 格式化当前文件
 - `HarmonyOS: Manage Dependencies` — manage oh-package.json5 / 管理依赖
@@ -137,7 +154,7 @@ Run `HarmonyOS: Preview Component` on any `.ets` file to see a simplified previe
 Built with a microkernel architecture for minimal footprint:
 采用微内核架构，极致轻量：
 - **4-layer lazy loading / 4 层懒加载** — features load only when needed / 功能按需加载
-- **~73KB production bundle / ~73KB 生产包** — ultra-lightweight / 超轻量
+- **~130KB production bundle / ~130KB 生产包** — ultra-lightweight / 超轻量
 - **EventBus + Registry / 事件总线 + 注册表** — extensible plugin system / 可扩展的插件系统
 - **Public API / 公共 API** — third-party extensions can integrate via the exported API / 第三方扩展可通过导出的 API 集成
 
@@ -166,6 +183,8 @@ Built with a microkernel architecture for minimal footprint:
 | `HarmonyOS: Extract to $r() Resource` | Extract string to resource / 提取字符串为资源 |
 | `HarmonyOS: Manage Dependencies` | Manage oh-package.json5 / 管理依赖 |
 | `HarmonyOS: Search HarmonyOS Docs` | Search official docs / 搜索官方文档 |
+| `HarmonyOS: Migrate V1 → V2 Decorators` | One-click V1 to V2 decorator migration / 一键 V1→V2 装饰器迁移 |
+| `HarmonyOS: Check API Compatibility` | Scan project for API version issues / 扫描项目 API 版本兼容问题 |
 
 ## License / 许可证
 
