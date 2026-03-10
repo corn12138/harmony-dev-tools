@@ -673,5 +673,142 @@
       ".height(${4:300})"
     ],
     "description": "XComponent for native rendering (Canvas/Game)"
+  },
+
+  "@Require + @Param (API 13+)": {
+    "prefix": "require",
+    "body": "@Require @Param ${1:name}: ${2:string};",
+    "description": "[API 13+] @Require @Param — required parent-to-child parameter"
+  },
+  "@Type Decorator (API 14+)": {
+    "prefix": "type",
+    "body": "@Type(${1:MyClass})\n@Trace ${2:data}: ${1:MyClass} = new ${1:MyClass}();",
+    "description": "[API 14+] @Type for PersistenceV2 serialization type annotation"
+  },
+  "makeObserved (API 14+)": {
+    "prefix": "makeobs",
+    "body": [
+      "import { UIUtils } from '@kit.ArkUI';",
+      "",
+      "const ${1:observed} = UIUtils.makeObserved(${2:rawObject});"
+    ],
+    "description": "[API 14+] makeObserved — add observability to plain objects"
+  },
+  "@Sendable Class": {
+    "prefix": "sendable",
+    "body": [
+      "@Sendable",
+      "class ${1:SharedData} {",
+      "  ${2:value}: ${3:string} = '${4}';",
+      "  $0",
+      "}"
+    ],
+    "description": "@Sendable class for cross-thread data transfer"
+  },
+  "PersistenceV2 (API 12+)": {
+    "prefix": "persistv2",
+    "body": [
+      "import { PersistenceV2 } from '@kit.ArkUI';",
+      "",
+      "const ${1:persisted} = PersistenceV2.connect(",
+      "  ${2:MyModel},",
+      "  '${3:persistKey}',",
+      "  () => new ${2:MyModel}()",
+      ")!;",
+      "$0"
+    ],
+    "description": "[V2] PersistenceV2 persistent state management"
+  },
+  "Navigation + NavPathStack": {
+    "prefix": "navstack",
+    "body": [
+      "@Local navStack: NavPathStack = new NavPathStack();",
+      "",
+      "build() {",
+      "  Navigation(this.navStack) {",
+      "    $0",
+      "  }",
+      "  .title('${1:Home}')",
+      "  .navDestination(this.pageBuilder)",
+      "}",
+      "",
+      "@Builder",
+      "pageBuilder(name: string) {",
+      "  if (name === '${2:detail}') {",
+      "    ${3:DetailPage}()",
+      "  }",
+      "}"
+    ],
+    "description": "Navigation with NavPathStack routing (replaces router)"
+  },
+  "UIContext animateTo (API 12+)": {
+    "prefix": "uianimate",
+    "body": [
+      "this.getUIContext().animateTo({",
+      "  duration: ${1:300},",
+      "  curve: Curve.${2:EaseInOut},",
+      "}, () => {",
+      "  $0",
+      "});"
+    ],
+    "description": "[API 12+] UIContext.animateTo — replaces global animateTo"
+  },
+  "Drag Events (API 14+)": {
+    "prefix": "drag",
+    "body": [
+      ".draggable(true)",
+      ".onDragStart((event: DragEvent) => {",
+      "  $1",
+      "})",
+      ".onDrop((event: DragEvent) => {",
+      "  $2",
+      "})"
+    ],
+    "description": "[API 14+] Drag and drop event handlers"
+  },
+  "Chip Component (API 13+)": {
+    "prefix": "chip",
+    "body": [
+      "Chip({",
+      "  prefixIcon: { src: \\$r('app.media.${1:icon}') },",
+      "  label: { text: '${2:Label}' },",
+      "  allowClose: ${3:true},",
+      "  onClose: () => {",
+      "    $0",
+      "  }",
+      "})"
+    ],
+    "description": "[API 13+] Chip component"
+  },
+  "SegmentButton (API 13+)": {
+    "prefix": "segment",
+    "body": [
+      "SegmentButton({",
+      "  type: SegmentButtonType.${1:TAB},",
+      "  options: [",
+      "    { text: '${2:Tab 1}' },",
+      "    { text: '${3:Tab 2}' },",
+      "    { text: '${4:Tab 3}' }",
+      "  ],",
+      "  selectedIndex: this.${5:selectedIdx}",
+      "})"
+    ],
+    "description": "[API 13+] SegmentButton tab/filter component"
+  },
+  "@Once + @Param (V2)": {
+    "prefix": "once",
+    "body": "@Once @Param ${1:initValue}: ${2:string} = ${3:''};",
+    "description": "[V2] @Once @Param — one-time initialization, not re-synced from parent"
+  },
+  "Repeat (API 12+)": {
+    "prefix": "repeat",
+    "body": [
+      "Repeat<${1:string}>(this.${2:items})",
+      "  .each((rep: RepeatItem<${1:string}>) => {",
+      "    $0",
+      "  })",
+      "  .key((item: ${1:string}) => JSON.stringify(item))"
+    ],
+    "description": "[API 12+] Repeat — type-safe replacement for ForEach"
   }
 }

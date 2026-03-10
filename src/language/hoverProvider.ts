@@ -39,6 +39,12 @@ const DECORATOR_DOCS: Record<string, string> = {
   '@Preview': 'Enables component preview in the IDE previewer.\n\n在 IDE 预览器中启用组件预览。',
   '@Ability': 'Declares an Ability class for HarmonyOS application lifecycle.\n\n声明 HarmonyOS 应用生命周期的 Ability 类。',
   '@AnimatableExtend': 'Extends components with animatable custom attributes.\n\n扩展组件的可动画自定义属性。',
+
+  // ---- API 13+ ----
+  '@Require': '[API 13+] Marks a @Param or @BuilderParam as required. Build fails if the parent does not provide a value.\n\n[API 13+] 标记 @Param 或 @BuilderParam 为必传参数，父组件未传值时编译失败。',
+
+  // ---- API 14+ ----
+  '@Type': '[API 14+] Specifies the concrete type for a @Trace property during serialization/deserialization with PersistenceV2.\n\n[API 14+] 为 PersistenceV2 序列化/反序列化时的 @Trace 属性指定具体类型。',
 };
 
 export function provideHover(

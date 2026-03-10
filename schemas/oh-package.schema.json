@@ -22,7 +22,17 @@
     },
     "dynamicDependencies": {
       "type": "object",
-      "description": "动态依赖 / Dynamic dependencies",
+      "description": "动态依赖 / Dynamic dependencies (API 12+)",
+      "additionalProperties": { "type": "string" }
+    },
+    "overrides": {
+      "type": "object",
+      "description": "依赖版本覆盖 / Dependency version overrides (API 13+)",
+      "additionalProperties": { "type": "string" }
+    },
+    "overrideDependencyMap": {
+      "type": "object",
+      "description": "依赖映射覆盖 / Dependency map overrides (API 14+)",
       "additionalProperties": { "type": "string" }
     },
     "scripts": {

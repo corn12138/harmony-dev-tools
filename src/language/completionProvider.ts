@@ -19,9 +19,15 @@ const ARKUI_COMPONENTS = [
   'Canvas', 'Circle', 'Ellipse', 'Line', 'Path', 'Polygon', 'Polyline', 'Rect', 'Shape',
   // Menu & Dialog
   'Menu', 'MenuItem', 'MenuItemGroup',
-  // HarmonyOS NEXT new components (API 12+)
+  // API 12+ components
   'CalendarPicker', 'ContainerSpan', 'SymbolGlyph', 'SymbolSpan',
   'NodeContainer', 'ContentSlot', 'ComponentContent',
+  // API 13+ components
+  'IsolatedComponent', 'NodeAdapter', 'EmbeddedComponent',
+  'Chip', 'ChipGroup', 'SegmentButton',
+  // API 14+ components
+  'EffectComponent', 'MarqueeV2',
+  'FormLink', 'GridObjectSortComponent',
 ];
 
 const LIFECYCLE_METHODS = [
@@ -30,6 +36,9 @@ const LIFECYCLE_METHODS = [
   { name: 'onPageShow', doc: 'Called when the page is displayed (Entry only)' },
   { name: 'onPageHide', doc: 'Called when the page is hidden (Entry only)' },
   { name: 'onBackPress', doc: 'Called when the back button is pressed (Entry only)' },
+  { name: 'aboutToReuse', doc: 'Called when a reusable component is about to be reused (@Reusable)' },
+  { name: 'aboutToRecycle', doc: 'Called when a reusable component is recycled (@Reusable)' },
+  { name: 'onWillApplyTheme', doc: 'Called before theme is applied to the component (API 12+)' },
 ];
 
 export function provideCompletionItems(

@@ -50,8 +50,41 @@ export const ARKTS_DECORATORS = [
   '@Monitor', '@Computed', '@Provider', '@Consumer',
   // Style
   '@Styles', '@Extend', '@AnimatableExtend',
-  // Concurrency
+  // Concurrency (API 12+, enhanced in API 14)
   '@Concurrent', '@Sendable',
   // Ability
   '@Ability',
+  // API 13+ new decorators
+  '@Require',
+  // API 14+ new decorators
+  '@Type',
 ] as const;
+
+export const API_VERSIONS = {
+  API_12: 12,
+  API_13: 13,
+  API_14: 14,
+} as const;
+
+export const DEPRECATED_APIS: Array<{
+  name: string;
+  replacement: string;
+  sinceApi: number;
+  kind: 'function' | 'module' | 'decorator';
+}> = [
+  { name: 'animateTo', replacement: 'UIContext.animateTo()', sinceApi: 11, kind: 'function' },
+  { name: "from '@ohos.router'", replacement: "@ohos.arkui.UIContext router (Navigation)", sinceApi: 12, kind: 'module' },
+  { name: "from '@ohos.promptAction'", replacement: "@ohos.arkui.UIContext promptAction", sinceApi: 12, kind: 'module' },
+  { name: "from '@ohos.mediaquery'", replacement: "@ohos.arkui.UIContext mediaQuery", sinceApi: 12, kind: 'module' },
+  { name: "from '@ohos.animator'", replacement: "@ohos.arkui.UIContext animator", sinceApi: 12, kind: 'module' },
+  { name: "from '@ohos.fileio'", replacement: "@ohos.file.fs", sinceApi: 11, kind: 'module' },
+  { name: "from '@ohos.notification'", replacement: "@ohos.notificationManager", sinceApi: 11, kind: 'module' },
+  { name: "from '@ohos.bundle'", replacement: "@ohos.bundle.bundleManager", sinceApi: 11, kind: 'module' },
+  { name: "from '@ohos.data.rdb'", replacement: "@ohos.data.relationalStore", sinceApi: 11, kind: 'module' },
+  { name: "from '@ohos.multimedia.camera'", replacement: "@ohos.multimedia.camera (new API)", sinceApi: 11, kind: 'module' },
+  { name: "from '@ohos.contact'", replacement: "@ohos.contact (new API)", sinceApi: 12, kind: 'module' },
+  { name: "AlertDialog.show", replacement: "UIContext.showAlertDialog() or promptAction", sinceApi: 12, kind: 'function' },
+  { name: "router.pushUrl", replacement: "Navigation + NavPathStack", sinceApi: 12, kind: 'function' },
+  { name: "router.replaceUrl", replacement: "Navigation + NavPathStack", sinceApi: 12, kind: 'function' },
+  { name: "router.back", replacement: "Navigation + NavPathStack.pop()", sinceApi: 12, kind: 'function' },
+];

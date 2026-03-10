@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.2.4] - 2026-03-10
+
+### Added
+- **API 13/14 Support** — full compatibility with HarmonyOS 5.0.1 (API 13) and 5.0.2 (API 14):
+  - New decorators: `@Require` (API 13+), `@Type` (API 14+)
+  - New components: `IsolatedComponent`, `NodeAdapter`, `EmbeddedComponent`, `Chip`, `ChipGroup`, `SegmentButton` (API 13+), `EffectComponent`, `MarqueeV2` (API 14+)
+  - New APIs: `makeObserved`, `UIContext.getPromptAction`, `UIContext.getOverlayManager` (API 14+)
+- **Deprecated API Detection** — scans `.ets` files for deprecated APIs and suggests modern replacements:
+  - `animateTo` → `UIContext.animateTo()`
+  - `@ohos.router` → `Navigation + NavPathStack`
+  - `@ohos.fileio` → `@ohos.file.fs`
+  - `router.pushUrl/replaceUrl/back` → `NavPathStack`
+  - 15+ deprecated module/function patterns detected
+- **Upgraded API Compatibility Checker** — now checks API 12/13/14 feature usage against `compileSdkVersion`:
+  - Per-API-level feature detection (decorators, components, APIs)
+  - Line-number reporting for each issue
+  - Upgrade suggestions when targeting older API levels
+  - `modelVersion` outdated warning for API 14+ projects
+- **15+ New Code Snippets**:
+  - `require` — `@Require @Param` (API 13+)
+  - `type` — `@Type` decorator (API 14+)
+  - `makeobs` — `UIUtils.makeObserved()` (API 14+)
+  - `sendable` — `@Sendable` class
+  - `persistv2` — `PersistenceV2` state management
+  - `navstack` — `Navigation + NavPathStack` routing
+  - `uianimate` — `UIContext.animateTo()` (modern animation)
+  - `drag` — drag-and-drop events (API 14+)
+  - `chip` — `Chip` component (API 13+)
+  - `segment` — `SegmentButton` (API 13+)
+  - `once` — `@Once @Param` (V2)
+  - `repeat` — `Repeat` type-safe loop (API 12+)
+- **New Lifecycle Completions**: `aboutToReuse`, `aboutToRecycle`, `onWillApplyTheme`
+- **Hover Documentation** for `@Require` (API 13+) and `@Type` (API 14+)
+- **JSON Schema Updates**:
+  - `build-profile.json5`: `buildOption.strictMode`, `useNormalizedOHMUrl` (API 14+), array `srcPath`
+  - `module.json5`: `routerMap` (API 12+), `launchType`, `orientation`, `default` device type
+  - `oh-package.json5`: `overrides` (API 13+), `overrideDependencyMap` (API 14+)
+  - `hvigor-config.json5`: `modelVersion` examples updated to include `5.0.1`, `5.0.2`
+- **258 Unit Tests** — comprehensive test suite covering constants, completions, hover, snippets, schemas, and API compatibility checker
+
+### Changed
+- Decorator list expanded to 30+ (added `@Require`, `@Type`)
+- ArkUI component completions expanded to 85+ (from 70+)
+- Snippet count increased to 70+ (from 55+)
+- API compatibility checker now reports line numbers for each issue
+
 ## [0.2.2] - 2026-03-08
 
 ### Added

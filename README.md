@@ -10,9 +10,9 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
 
 ### Language Support / 语言支持
 - **ArkTS syntax highlighting / ArkTS 语法高亮** — for `.ets` files / 适用于 `.ets` 文件
-- **55+ code snippets / 55+ 代码片段** — type `comp`, `entry`, `col`, `row`, `btn`, `state`, `compv2`, `local`, `param`, `monitor`, etc. / 输入 `comp`、`entry`、`compv2`、`local`、`param`、`monitor` 等触发
-- **Auto-completion / 自动补全** — decorators (`@Component`, `@State`, `@ComponentV2`, `@Local`...), ArkUI components (70+), and lifecycle methods / 装饰器（V1+V2）、ArkUI 组件（70+）、生命周期方法
-- **Hover documentation / 悬浮文档** — bilingual docs for 30+ ArkTS decorators (V1 & V2) / 30+ 装饰器中英文悬浮文档（V1 & V2）
+- **70+ code snippets / 70+ 代码片段** — type `comp`, `entry`, `compv2`, `local`, `param`, `monitor`, `require`, `type`, `makeobs`, `sendable`, `navstack`, etc. / 输入前缀触发
+- **Auto-completion / 自动补全** — decorators (V1+V2+API 13/14), ArkUI components (85+), and lifecycle methods / 装饰器（含 `@Require`、`@Type`）、ArkUI 组件（85+）、生命周期方法
+- **Hover documentation / 悬浮文档** — bilingual docs for 30+ ArkTS decorators (V1, V2, API 13+, API 14+) / 30+ 装饰器中英文悬浮文档
 - **CodeLens** — showing component references and `@Entry` route info / 显示组件引用计数和 `@Entry` 路由信息
 - **Color preview / 颜色预览** — hex colors (`#RRGGBB`, `#AARRGGBB`) and named colors (`Color.Red`) / 十六进制颜色和命名颜色
 
@@ -23,15 +23,21 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
 
 ### HarmonyOS NEXT / V2 State Management / V2 状态管理
 
-> **NEW in v0.2.0+** — Full support for HarmonyOS NEXT (API 12+) V2 decorators.
-> **v0.2.0+ 新增** — 全面支持 HarmonyOS NEXT（API 12+）V2 装饰器。
+> **v0.2.0+** — Full support for HarmonyOS NEXT (API 12+) V2 decorators.
+> **v0.2.4 NEW** — API 13 (HarmonyOS 5.0.1) and API 14 (HarmonyOS 5.0.2) support.
 
 - **V2 Decorator support / V2 装饰器支持** — `@ComponentV2`, `@Local`, `@Param`, `@Once`, `@Event`, `@Monitor`, `@Computed`, `@ObservedV2`, `@Trace`, `@Provider`, `@Consumer`
+- **API 13+ Decorators / API 13+ 装饰器** — `@Require` (required parameter enforcement)
+- **API 14+ Decorators / API 14+ 装饰器** — `@Type` (PersistenceV2 type annotation)
+- **API 14+ APIs** — `makeObserved()`, enhanced drag-and-drop events, `EffectComponent`
 - **V1 → V2 Migration / V1 → V2 迁移** — run `HarmonyOS: Migrate V1 → V2 Decorators` to one-click migrate decorators in the current file / 运行命令一键迁移当前文件中的装饰器
   - `@Component` → `@ComponentV2`, `@State` → `@Local`, `@Prop` → `@Param`, `@Provide` → `@Provider`, `@Consume` → `@Consumer`, `@Watch` → `@Monitor`, `@Observed` → `@ObservedV2`
   - Detects V1/V2 mixing and warns before proceeding / 检测 V1/V2 混用并在执行前警告
 - **API Compatibility Check / API 兼容性检查** — run `HarmonyOS: Check API Compatibility` to scan your project for version mismatches / 运行命令扫描项目中的版本兼容问题
-  - Validates V2 decorator usage against `compileSdkVersion` / 检查 V2 装饰器使用是否匹配编译 SDK 版本
+  - Validates feature usage against `compileSdkVersion` for API 12/13/14 / 检查各 API 级别特性使用是否匹配编译 SDK 版本
+  - **Deprecated API detection / 废弃 API 检测** — detects 15+ deprecated modules and functions with migration suggestions / 检测 15+ 废弃模块和函数并给出迁移建议
+  - Line-number reporting for each issue / 每个问题报告行号
+  - Upgrade suggestions / 升级建议
   - Checks `hvigor-config.json5` `modelVersion` / 检查 hvigor 配置版本
   - Reports V1/V2 mixing in same file / 报告同文件 V1/V2 混用
 
@@ -157,6 +163,7 @@ Built with a microkernel architecture for minimal footprint:
 - **~130KB production bundle / ~130KB 生产包** — ultra-lightweight / 超轻量
 - **EventBus + Registry / 事件总线 + 注册表** — extensible plugin system / 可扩展的插件系统
 - **Public API / 公共 API** — third-party extensions can integrate via the exported API / 第三方扩展可通过导出的 API 集成
+- **258 unit tests / 258 个单元测试** — comprehensive test coverage / 全面的测试覆盖
 
 ## All Commands / 所有命令
 

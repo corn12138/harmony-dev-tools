@@ -20,9 +20,13 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["phone", "tablet", "tv", "wearable", "car", "2in1"]
+            "enum": ["phone", "tablet", "tv", "wearable", "car", "2in1", "default"]
           },
           "description": "支持的设备类型 / Supported device types"
+        },
+        "routerMap": {
+          "type": "string",
+          "description": "[API 12+] 路由表配置文件路径 (e.g., '$profile:route_map') / Navigation route map config"
         },
         "deliveryWithInstall": { "type": "boolean", "description": "是否随应用安装" },
         "installationFree": { "type": "boolean", "description": "是否支持免安装" },
@@ -41,6 +45,9 @@
               "startWindowIcon": { "type": "string" },
               "startWindowBackground": { "type": "string" },
               "exported": { "type": "boolean", "description": "是否可被外部调用" },
+              "launchType": { "type": "string", "enum": ["singleton", "multiton", "specified"], "description": "启动模式 / Launch type" },
+              "removeMissionAfterTerminate": { "type": "boolean", "description": "终止后移除任务 (API 13+)" },
+              "orientation": { "type": "string", "enum": ["unspecified", "landscape", "portrait", "landscape_inverted", "portrait_inverted", "auto_rotation"], "description": "屏幕方向" },
               "skills": {
                 "type": "array",
                 "items": {

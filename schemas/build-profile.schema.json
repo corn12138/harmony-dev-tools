@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "HarmonyOS Build Profile",
-  "description": "HarmonyOS 构建配置文件 / Build configuration file",
+  "description": "HarmonyOS 构建配置文件 / Build configuration file (supports API 12-14)",
   "type": "object",
   "properties": {
     "app": {
@@ -22,7 +22,10 @@
                   "certpath": { "type": "string" },
                   "storeFile": { "type": "string" },
                   "signAlg": { "type": "string" },
-                  "profile": { "type": "string" }
+                  "profile": { "type": "string" },
+                  "keyAlias": { "type": "string", "description": "密钥别名 / Key alias" },
+                  "storePassword": { "type": "string" },
+                  "keyPassword": { "type": "string" }
                 }
               }
             }
@@ -36,9 +39,23 @@
             "properties": {
               "name": { "type": "string", "description": "产品名称 (default/free/paid)" },
               "signingConfig": { "type": "string" },
-              "compatibleSdkVersion": { "type": ["string", "number"], "description": "最低兼容 SDK 版本" },
-              "compileSdkVersion": { "type": ["string", "number"], "description": "编译 SDK 版本" },
-              "runtimeOS": { "type": "string", "enum": ["HarmonyOS", "OpenHarmony"] }
+              "compatibleSdkVersion": { "type": ["string", "number"], "description": "最低兼容 SDK 版本 (e.g., 12)" },
+              "compileSdkVersion": { "type": ["string", "number"], "description": "编译 SDK 版本 (e.g., 14)" },
+              "runtimeOS": { "type": "string", "enum": ["HarmonyOS", "OpenHarmony"] },
+              "bundleName": { "type": "string", "description": "应用包名 / Bundle name (API 13+)" },
+              "buildOption": {
+                "type": "object",
+                "description": "构建选项 / Build options",
+                "properties": {
+                  "strictMode": {
+                    "type": "object",
+                    "properties": {
+                      "caseSensitiveCheck": { "type": "boolean", "description": "大小写敏感检查" },
+                      "useNormalizedOHMUrl": { "type": "boolean", "description": "使用标准化 OHM URL (API 14+)" }
+                    }
+                  }
+                }
+              }
             },
             "required": ["name"]
           }
@@ -52,7 +69,11 @@
         "type": "object",
         "properties": {
           "name": { "type": "string", "description": "模块名称 / Module name" },
-          "srcPath": { "type": "string", "description": "源码路径 / Source path" },
+          "srcPath": {
+            "type": ["string", "array"],
+            "description": "源码路径（API 14+ 支持数组形式跨项目引用）/ Source path (array supported in API 14+)",
+            "items": { "type": "string" }
+          },
           "targets": {
             "type": "array",
             "items": {

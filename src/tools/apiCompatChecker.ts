@@ -1,21 +1,32 @@
 import * as vscode from 'vscode';
+import { DEPRECATED_APIS } from '../utils/constants';
 
-/**
- * API Compatibility Checker
- * Detects the project's target API version and checks for compatibility issues.
- */
-
-interface CompatIssue {
+export interface CompatIssue {
   message: string;
   severity: 'error' | 'warning' | 'info';
   file?: string;
+  line?: number;
 }
 
-// V2 decorators require API 12+
 const V2_DECORATORS = ['@ComponentV2', '@Local', '@Param', '@Once', '@Event', '@Monitor', '@Computed', '@Provider', '@Consumer', '@ObservedV2', '@Trace'];
 
-// API 12+ new components
-const API12_COMPONENTS = ['CalendarPicker', 'ContainerSpan', 'SymbolGlyph', 'SymbolSpan', 'NodeContainer', 'ContentSlot', 'ComponentContent'];
+const API_LEVEL_FEATURES: Record<number, { decorators: string[]; components: string[]; apis: string[] }> = {
+  12: {
+    decorators: V2_DECORATORS,
+    components: ['CalendarPicker', 'ContainerSpan', 'SymbolGlyph', 'SymbolSpan', 'NodeContainer', 'ContentSlot', 'ComponentContent'],
+    apis: ['AppStorageV2', 'PersistenceV2'],
+  },
+  13: {
+    decorators: ['@Require'],
+    components: ['IsolatedComponent', 'NodeAdapter', 'EmbeddedComponent'],
+    apis: ['UIContext.getHostContext', 'UIContext.getMediaQuery'],
+  },
+  14: {
+    decorators: ['@Type'],
+    components: ['MarqueeV2', 'EffectComponent'],
+    apis: ['makeObserved', 'UIContext.getPromptAction', 'UIContext.getOverlayManager'],
+  },
+};
 
 export async function checkApiCompatibility(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
@@ -24,47 +35,64 @@ export async function checkApiCompatibility(): Promise<void> {
     return;
   }
 
-  const rootPath = folder.uri.fsPath;
   const issues: CompatIssue[] = [];
 
-  // Step 1: Detect API version from build-profile.json5
   const apiVersion = await detectApiVersion(folder.uri);
 
-  // Step 2: Check hvigor-config.json5
   const hvigorIssues = await checkHvigorConfig(folder.uri, apiVersion);
   issues.push(...hvigorIssues);
 
-  // Step 3: Scan .ets files for compatibility issues
-  const etsFiles = await vscode.workspace.findFiles('**/*.ets', '**/node_modules/**', 50);
+  const etsFiles = await vscode.workspace.findFiles('**/*.ets', '**/node_modules/**', 100);
   for (const file of etsFiles) {
     const content = await vscode.workspace.fs.readFile(file);
     const text = Buffer.from(content).toString('utf8');
     const relativePath = vscode.workspace.asRelativePath(file);
+    const lines = text.split('\n');
 
-    // Check V2 decorator usage with old API
-    if (apiVersion && apiVersion < 12) {
-      for (const dec of V2_DECORATORS) {
-        if (text.includes(dec)) {
-          issues.push({
-            message: `${dec} requires API 12+, but project targets API ${apiVersion}`,
-            severity: 'error',
-            file: relativePath,
-          });
-        }
-      }
-      for (const comp of API12_COMPONENTS) {
-        if (text.includes(comp)) {
-          issues.push({
-            message: `${comp} requires API 12+, but project targets API ${apiVersion}`,
-            severity: 'warning',
-            file: relativePath,
-          });
+    // Check features against project API level
+    if (apiVersion) {
+      for (const [apiStr, features] of Object.entries(API_LEVEL_FEATURES)) {
+        const requiredApi = parseInt(apiStr, 10);
+        if (apiVersion < requiredApi) {
+          for (const dec of features.decorators) {
+            const lineIdx = lines.findIndex(l => l.includes(dec));
+            if (lineIdx >= 0) {
+              issues.push({
+                message: `${dec} requires API ${requiredApi}+, but project targets API ${apiVersion}`,
+                severity: 'error',
+                file: relativePath,
+                line: lineIdx + 1,
+              });
+            }
+          }
+          for (const comp of features.components) {
+            const lineIdx = lines.findIndex(l => new RegExp(`\\b${comp}\\b`).test(l));
+            if (lineIdx >= 0) {
+              issues.push({
+                message: `${comp} requires API ${requiredApi}+, but project targets API ${apiVersion}`,
+                severity: 'warning',
+                file: relativePath,
+                line: lineIdx + 1,
+              });
+            }
+          }
+          for (const api of features.apis) {
+            const lineIdx = lines.findIndex(l => l.includes(api));
+            if (lineIdx >= 0) {
+              issues.push({
+                message: `${api} requires API ${requiredApi}+, but project targets API ${apiVersion}`,
+                severity: 'warning',
+                file: relativePath,
+                line: lineIdx + 1,
+              });
+            }
+          }
         }
       }
     }
 
     // Check V1+V2 mixing
-    const hasV1 = ['@Component\n', '@State ', '@Prop '].some(p => text.includes(p));
+    const hasV1 = ['@Component\n', '@Component ', '@State ', '@Prop '].some(p => text.includes(p));
     const hasV2 = V2_DECORATORS.some(d => text.includes(d));
     if (hasV1 && hasV2) {
       issues.push({
@@ -73,20 +101,36 @@ export async function checkApiCompatibility(): Promise<void> {
         file: relativePath,
       });
     }
+
+    // Check deprecated APIs
+    for (const dep of DEPRECATED_APIS) {
+      const lineIdx = lines.findIndex(l => l.includes(dep.name));
+      if (lineIdx >= 0) {
+        issues.push({
+          message: `"${dep.name}" is deprecated since API ${dep.sinceApi}. Use "${dep.replacement}" instead.`,
+          severity: apiVersion && apiVersion >= dep.sinceApi + 2 ? 'warning' : 'info',
+          file: relativePath,
+          line: lineIdx + 1,
+        });
+      }
+    }
   }
 
-  // Step 4: Show results
+  showResults(issues, apiVersion);
+}
+
+function showResults(issues: CompatIssue[], apiVersion: number | null): void {
   if (issues.length === 0) {
     const apiStr = apiVersion ? `API ${apiVersion}` : 'unknown API version';
     vscode.window.showInformationMessage(`No compatibility issues found. Project targets ${apiStr}.`);
     return;
   }
 
-  // Show in Output channel
   const channel = vscode.window.createOutputChannel('HarmonyOS Compatibility');
   channel.clear();
   channel.appendLine(`=== HarmonyOS API Compatibility Check ===`);
   channel.appendLine(`Target API: ${apiVersion ?? 'unknown'}`);
+  channel.appendLine(`Latest available: API 14 (HarmonyOS 5.0.2)`);
   channel.appendLine(`Issues found: ${issues.length}`);
   channel.appendLine('');
 
@@ -97,7 +141,8 @@ export async function checkApiCompatibility(): Promise<void> {
   if (errors.length) {
     channel.appendLine(`--- ERRORS (${errors.length}) ---`);
     for (const issue of errors) {
-      channel.appendLine(`  [ERROR] ${issue.file ? `${issue.file}: ` : ''}${issue.message}`);
+      const loc = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}: ` : '';
+      channel.appendLine(`  [ERROR] ${loc}${issue.message}`);
     }
     channel.appendLine('');
   }
@@ -105,7 +150,8 @@ export async function checkApiCompatibility(): Promise<void> {
   if (warnings.length) {
     channel.appendLine(`--- WARNINGS (${warnings.length}) ---`);
     for (const issue of warnings) {
-      channel.appendLine(`  [WARN] ${issue.file ? `${issue.file}: ` : ''}${issue.message}`);
+      const loc = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}: ` : '';
+      channel.appendLine(`  [WARN] ${loc}${issue.message}`);
     }
     channel.appendLine('');
   }
@@ -113,28 +159,40 @@ export async function checkApiCompatibility(): Promise<void> {
   if (infos.length) {
     channel.appendLine(`--- INFO (${infos.length}) ---`);
     for (const issue of infos) {
-      channel.appendLine(`  [INFO] ${issue.file ? `${issue.file}: ` : ''}${issue.message}`);
+      const loc = issue.file ? `${issue.file}${issue.line ? `:${issue.line}` : ''}: ` : '';
+      channel.appendLine(`  [INFO] ${loc}${issue.message}`);
     }
+    channel.appendLine('');
+  }
+
+  // Upgrade suggestions
+  if (apiVersion && apiVersion < 14) {
+    channel.appendLine(`--- UPGRADE SUGGESTIONS ---`);
+    if (apiVersion < 13) {
+      channel.appendLine(`  [TIP] Upgrade to API 13 (HarmonyOS 5.0.1) for: @Require decorator, IsolatedComponent, enhanced UIContext APIs`);
+    }
+    if (apiVersion < 14) {
+      channel.appendLine(`  [TIP] Upgrade to API 14 (HarmonyOS 5.0.2) for: @Type decorator, makeObserved(), enhanced drag-and-drop, EffectComponent`);
+    }
+    channel.appendLine('');
   }
 
   channel.show();
 
   vscode.window.showWarningMessage(
-    `Found ${errors.length} errors, ${warnings.length} warnings. See Output panel for details.`
+    `Found ${errors.length} error(s), ${warnings.length} warning(s), ${infos.length} info(s). See Output panel.`
   );
 }
 
-async function detectApiVersion(rootUri: vscode.Uri): Promise<number | null> {
+export async function detectApiVersion(rootUri: vscode.Uri): Promise<number | null> {
   try {
     const buildProfile = vscode.Uri.joinPath(rootUri, 'build-profile.json5');
     const content = await vscode.workspace.fs.readFile(buildProfile);
     const text = Buffer.from(content).toString('utf8');
 
-    // Match "compileSdkVersion": 12 or compileSdkVersion: 12
     const match = text.match(/["']?compileSdkVersion["']?\s*[:=]\s*(\d+)/);
     if (match) return parseInt(match[1], 10);
 
-    // Also try compatibleSdkVersion
     const compatMatch = text.match(/["']?compatibleSdkVersion["']?\s*[:=]\s*(\d+)/);
     if (compatMatch) return parseInt(compatMatch[1], 10);
 
@@ -152,7 +210,6 @@ async function checkHvigorConfig(rootUri: vscode.Uri, apiVersion: number | null)
     const content = await vscode.workspace.fs.readFile(configUri);
     const text = Buffer.from(content).toString('utf8');
 
-    // API 12+ requires modelVersion
     if (apiVersion && apiVersion >= 12) {
       if (!text.includes('modelVersion')) {
         issues.push({
@@ -160,9 +217,17 @@ async function checkHvigorConfig(rootUri: vscode.Uri, apiVersion: number | null)
           severity: 'warning',
           file: 'hvigor/hvigor-config.json5',
         });
+      } else if (apiVersion >= 14) {
+        const versionMatch = text.match(/["']?modelVersion["']?\s*[:=]\s*["'](\d+\.\d+\.\d+)["']/);
+        if (versionMatch && versionMatch[1] < '5.0.2') {
+          issues.push({
+            message: `modelVersion "${versionMatch[1]}" may be outdated for API ${apiVersion}. Consider updating to "5.0.2".`,
+            severity: 'info',
+            file: 'hvigor/hvigor-config.json5',
+          });
+        }
       }
 
-      // Deprecated fields in API 12+
       if (text.includes('hvigorVersion')) {
         issues.push({
           message: '"hvigorVersion" in hvigor-config.json5 is deprecated for API 12+. Remove it and use "modelVersion" instead.',
@@ -170,9 +235,17 @@ async function checkHvigorConfig(rootUri: vscode.Uri, apiVersion: number | null)
           file: 'hvigor/hvigor-config.json5',
         });
       }
+
+      if (text.includes('@ohos/hvigor-ohos-plugin')) {
+        issues.push({
+          message: '"@ohos/hvigor-ohos-plugin" in dependencies is deprecated for API 12+. Remove it when using modelVersion.',
+          severity: 'info',
+          file: 'hvigor/hvigor-config.json5',
+        });
+      }
     }
   } catch {
-    // hvigor-config.json5 doesn't exist, that's OK for some project types
+    // hvigor-config.json5 doesn't exist, OK for some project types
   }
 
   return issues;
