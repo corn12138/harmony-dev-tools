@@ -41,6 +41,33 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
   - Checks `hvigor-config.json5` `modelVersion` / 检查 hvigor 配置版本
   - Reports V1/V2 mixing in same file / 报告同文件 V1/V2 混用
 
+### Real-time Diagnostics / 实时诊断 (v0.4.0+)
+
+> **NEW** — Catch errors instantly without waiting 20+ minutes for DevEco compilation.
+> **新功能** — 无需等待 DevEco 20+ 分钟编译，即时捕获错误。
+
+- **ArkTS strict type checking / ArkTS 严格类型检查** — detects `any`, `unknown`, `as any`, implicit `any` in function parameters / 检测 `any`、`unknown`、`as any`、函数参数隐式 `any`
+- **State management trap detection / 状态管理陷阱检测** — warns when `@State` is used with complex objects (shallow observation), detects V1/V2 mixing, flags `@Link` in `@ComponentV2` / 当 `@State` 用于复杂对象时警告（浅观察），检测 V1/V2 混用，标记 `@Link` 在 `@ComponentV2` 中
+- **Performance anti-pattern detection / 性能反模式检测** — flags `ForEach` (suggest `LazyForEach`), detects `fetch()`, `setTimeout`, `console.log`, `JSON.parse`, `await` inside `build()` / 标记 `ForEach`（建议 `LazyForEach`），检测 `build()` 中的网络请求、定时器、日志输出等
+- **Quick Fix / 快速修复** — auto-fix suggestions for all diagnostics: replace `any` with concrete types, `@State` → `@ObservedV2 + @Trace`, `@Link` → `@Param`, `ForEach` → `LazyForEach`, trigger V1→V2 migration / 所有诊断的自动修复建议
+
+### Performance Insight CodeLens / 性能洞察 CodeLens (v0.4.0+)
+
+- **`build()` analysis / `build()` 分析** — shows component count, nesting depth, and rendering strategy / 显示组件数量、嵌套深度和渲染策略
+- **ForEach/LazyForEach tips / ForEach/LazyForEach 提示** — inline CodeLens explaining rendering strategy and performance implications / 内联 CodeLens 说明渲染策略和性能影响
+- **State variable count / 状态变量计数** — shows state variable count per struct with warning for > 10 / 每个 struct 的状态变量计数，超过 10 个时警告
+
+### Config File Intelligence / 配置文件智能 (v0.4.0+)
+
+- **Hover documentation / 悬浮文档** — bilingual (中/EN) docs when hovering over keys in `build-profile.json5`, `module.json5`, `app.json5`, `oh-package.json5` / 悬浮在配置文件键名上时显示中英文文档
+- Covers 40+ configuration keys across 4 config file types / 覆盖 4 种配置文件中的 40+ 个配置键
+
+### OHPM Dependency Insight / OHPM 依赖洞察 (v0.4.0+)
+
+- **Outdated version detection / 过期版本检测** — checks 10+ popular OHPM packages against known latest versions / 检查 10+ 流行 OHPM 包的最新版本
+- **CodeLens on dependencies / 依赖 CodeLens** — inline package description and latest version on each dependency line / 每个依赖行内联显示包描述和最新版本
+- **Problems panel integration / 问题面板集成** — outdated dependencies appear in VS Code's Problems panel / 过期依赖显示在 VS Code 的问题面板中
+
 ### JSON Schema Validation / JSON Schema 校验
 - `build-profile.json5` — build configuration / 构建配置
 - `oh-package.json5` — package dependencies / 包依赖
@@ -125,9 +152,36 @@ Run `HarmonyOS: View Device Logs` to stream `hdc hilog` output to VS Code's Outp
 - `HarmonyOS: Manage Dependencies` — manage oh-package.json5 / 管理依赖
 - `HarmonyOS: Search HarmonyOS Docs` — search official docs / 搜索官方文档
 
-### Component Preview / 组件预览
-Run `HarmonyOS: Preview Component` on any `.ets` file to see a simplified preview of the UI layout in a WebView panel. Updates automatically on save.
-在任意 `.ets` 文件上运行 `HarmonyOS: Preview Component`，在 WebView 面板中查看 UI 布局的简化预览。保存时自动更新。
+### Device Mirror / 设备镜像 (v0.3.0+)
+
+> **NEW** — Mirror your device screen inside VS Code with full touch interaction.
+> **新功能** — 在 VS Code 中镜像设备屏幕，支持完整触控交互。
+
+- **Live screen streaming / 实时屏幕流** — HDC screenshot polling at 1-5 FPS / 基于 HDC 截图轮询，1-5 FPS 可调
+- **Touch forwarding / 触控转发** — click, swipe, long-press directly on the WebView canvas / 在 WebView 画布上直接点击、滑动、长按
+- **Key bar / 按键栏** — Home, Back, Recent, Volume, Power buttons / Home、返回、最近任务、音量、电源按键
+- **Auto device detection / 自动设备检测** — auto-selects first connected device / 自动选择第一个连接的设备
+- **No-device fallback / 无设备提示** — friendly message when no device is connected / 无设备连接时友好提示
+
+### Emulator Manager / 模拟器管理 (v0.3.0+)
+
+- **Auto-detect emulators / 自动检测模拟器** — scans DevEco Studio emulator directories (macOS/Windows/Linux) / 扫描 DevEco Studio 模拟器目录
+- **TreeView integration / 树视图集成** — Devices & Emulators sections in sidebar / 侧边栏设备和模拟器分组显示
+- **Launch / Stop / 启动/停止** — start emulators from VS Code, auto-opens Device Mirror when online / 从 VS Code 启动模拟器，上线后自动打开设备镜像
+- **Status monitoring / 状态监控** — running/stopped status with live icons / 运行/停止状态实时图标
+
+### Component Preview / 组件预览 (Enhanced v0.3.0+)
+
+Run `HarmonyOS: Preview Component` on any `.ets` file to see a live preview of the UI layout.
+在任意 `.ets` 文件上运行 `HarmonyOS: Preview Component`，查看 UI 布局的实时预览。
+
+- **15+ layout containers / 15+ 布局容器** — Column, Row, Stack, Grid, List, Flex, Scroll, Tabs, Navigation, RelativeContainer, etc.
+- **20+ leaf components / 20+ 叶子组件** — Text, Button, Image, TextInput, TextArea, Toggle, Slider, Progress, Search, Checkbox, Radio, Rating, etc.
+- **Style property rendering / 样式属性渲染** — width, height, padding, margin, backgroundColor, borderRadius, fontSize, fontColor, opacity, justifyContent, alignItems, layoutWeight, etc.
+- **Nested rendering / 嵌套渲染** — correct recursive AST-based rendering / 基于 AST 递归的正确嵌套渲染
+- **4 device frames / 4 种设备框架** — Phone, Tablet, Watch, Car / 手机、平板、手表、车机
+- **Auto-refresh on save / 保存自动刷新** — preview updates when switching files / 切换文件时预览自动更新
+- **Hover inspect / 悬浮检查** — hover to see component type labels / 悬浮查看组件类型标签
 
 ## Requirements / 环境要求
 
@@ -146,6 +200,9 @@ Run `HarmonyOS: Preview Component` on any `.ets` file to see a simplified previe
 | `harmony.autoFormatOnSave` | `false` | Auto-format ArkTS files on save / 保存时自动格式化 ArkTS 文件 |
 | `harmony.devicePollInterval` | `5000` | Device list refresh interval (ms) / 设备列表刷新间隔（毫秒） |
 | `harmony.logLevel` | `"info"` | Extension log level / 扩展日志级别 |
+| `harmony.enableDiagnostics` | `true` | Enable real-time ArkTS diagnostics / 启用实时 ArkTS 诊断 |
+| `harmony.enablePerfLens` | `true` | Show performance insight CodeLens / 显示性能洞察 CodeLens |
+| `harmony.enableOhpmInsight` | `true` | Show OHPM dependency insights / 显示 OHPM 依赖洞察 |
 
 ## Quick Start / 快速开始
 
@@ -163,7 +220,7 @@ Built with a microkernel architecture for minimal footprint:
 - **~130KB production bundle / ~130KB 生产包** — ultra-lightweight / 超轻量
 - **EventBus + Registry / 事件总线 + 注册表** — extensible plugin system / 可扩展的插件系统
 - **Public API / 公共 API** — third-party extensions can integrate via the exported API / 第三方扩展可通过导出的 API 集成
-- **258 unit tests / 258 个单元测试** — comprehensive test coverage / 全面的测试覆盖
+- **417 unit tests / 417 个单元测试** — comprehensive test coverage / 全面的测试覆盖
 
 ## All Commands / 所有命令
 
@@ -178,7 +235,10 @@ Built with a microkernel architecture for minimal footprint:
 | `HarmonyOS: Debug App on Device` | Launch with debugger attached / 附加调试器启动 |
 | `HarmonyOS: Stop App on Device` | Force-stop the running app / 强制停止运行中的应用 |
 | `HarmonyOS: Open UI Inspector` | Device UI hierarchy viewer / 设备 UI 层级查看器 |
-| `HarmonyOS: Preview Component` | Simplified component preview / 简化组件预览 |
+| `HarmonyOS: Open Device Mirror` | Mirror device screen with touch interaction / 镜像设备屏幕，支持触控交互 |
+| `HarmonyOS: Launch Emulator` | Launch a DevEco Studio emulator / 启动 DevEco Studio 模拟器 |
+| `HarmonyOS: Stop Emulator` | Stop a running emulator / 停止运行中的模拟器 |
+| `HarmonyOS: Preview Component` | Enhanced component preview / 增强组件预览 |
 | `HarmonyOS: View Device Logs` | Stream device logs / 流式查看设备日志 |
 | `HarmonyOS: Refresh Devices` | Refresh device list / 刷新设备列表 |
 | `HarmonyOS: Install HAP to Device` | Install a .hap file / 安装 .hap 文件 |

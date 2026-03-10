@@ -33,6 +33,9 @@ export const COMMANDS = {
   DEBUG_APP: 'harmony.debugApp',
   MIGRATE_V1_TO_V2: 'harmony.migrateV1ToV2',
   CHECK_API_COMPAT: 'harmony.checkApiCompat',
+  DEVICE_MIRROR: 'harmony.openDeviceMirror',
+  LAUNCH_EMULATOR: 'harmony.launchEmulator',
+  STOP_EMULATOR: 'harmony.stopEmulator',
 } as const;
 
 export const CONTEXT_KEYS = {

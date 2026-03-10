@@ -1,5 +1,91 @@
 # Changelog
 
+## [0.4.0] - 2026-03-10
+
+### Added — Developer Experience Enhancement / 开发者体验增强
+
+- **Real-time ArkTS Diagnostics** (`diagnosticProvider.ts`) — instant error detection without compilation:
+  - `any` / `unknown` type usage → Error with Quick Fix to replace with concrete type
+  - `as any` forced cast → Error with Quick Fix to remove
+  - Implicit `any` (function params without type annotation) → Warning with Quick Fix
+  - `@State` on complex objects (Array, Map, custom class) → Warning: shallow observation trap, suggests `@ObservedV2 + @Trace`
+  - V1/V2 decorator mixing in same file → Error
+  - `@Link` inside `@ComponentV2` → Error, suggests `@Param + @Event`
+  - `ForEach` usage → Info, suggests `LazyForEach` for large lists
+  - Heavy computation in `build()` → Warning: detects `fetch()`, `setTimeout`, `setInterval`, `console.log`, `JSON.parse`, `await`, imperative loops
+- **Quick Fix Provider** (`codeFixProvider.ts`) — CodeActionProvider with auto-fix for all 9 diagnostic rules:
+  - Replace `any`/`unknown` with string, number, boolean, object, or Record
+  - Remove `as any` cast
+  - Add `: string` type annotation to untyped parameters
+  - `@State` → `@Trace` (deep observation)
+  - `@Link` → `@Param` (V2 compatible)
+  - `ForEach` → `LazyForEach` (performance)
+  - V1/V2 mixing → triggers full V1→V2 migration command
+- **Performance Insight CodeLens** (`perfLens.ts`) — inline performance hints:
+  - `build()` methods: component count, nesting depth, ForEach/LazyForEach strategy
+  - `ForEach`/`LazyForEach` lines: rendering strategy explanation and tips
+  - `struct` definitions: state variable count with warning when > 10
+- **Config File Hover Documentation** (`configHoverProvider.ts`) — bilingual (中/EN) docs on hover:
+  - `build-profile.json5`: compileSdkVersion, products, modules, signingConfigs, etc.
+  - `module.json5`: type, deviceTypes, pages, abilities, requestPermissions, etc.
+  - `app.json5`: bundleName, versionCode, versionName, icon, label, etc.
+  - `oh-package.json5`: dependencies, devDependencies, dynamicDependencies, etc.
+  - 40+ configuration keys across 4 file types
+- **OHPM Dependency Insight** (`ohpmInsight.ts`) — dependency management intelligence:
+  - Outdated version detection for 10+ popular OHPM packages (@ohos/axios, @ohos/lottie, @ohos/hypium, etc.)
+  - CodeLens on each dependency showing package description and latest version
+  - Problems panel integration — outdated deps appear as diagnostics
+  - Automatic analysis on workspace open and oh-package.json5 save
+- **New configuration options**: `harmony.enableDiagnostics`, `harmony.enablePerfLens`, `harmony.enableOhpmInsight`
+- **83 new unit tests** (total 417) covering diagnostics (39 tests), perf lens (14), config hover (11), OHPM insight (19)
+
+### Changed
+- `extension.ts` — added Layer 1.8 (DX Enhancement) with lazy-loaded diagnostic, quick fix, perf lens, config hover, and OHPM insight providers
+- `package.json` — version bumped to 0.4.0, added 3 new configuration properties
+- V1/V2 mixing detection now uses regex word-boundary matching to avoid `@Component`/`@ComponentV2` false positives
+
+## [0.3.0] - 2026-03-10
+
+### Added
+- **Device Mirror Panel** — mirror your device/emulator screen inside VS Code:
+  - Live screenshot streaming via HDC at configurable 1-5 FPS
+  - Full touch interaction: click, swipe, long-press with coordinate mapping
+  - Navigation key bar: Home, Back, Recent Apps, Volume Up/Down, Power
+  - Auto device detection — selects the first connected device
+  - No-device fallback — friendly "connect a device" message
+  - Frame dedup guard — prevents concurrent screenshot requests from stacking
+  - FPS counter and device resolution display in status bar
+- **Emulator Manager** — manage DevEco Studio emulators from VS Code:
+  - Auto-detect emulator images across macOS, Windows, and Linux
+  - Find emulator executable from known DevEco Studio install paths
+  - Launch/stop emulators with progress notification and cancellation support
+  - Auto-opens Device Mirror when emulator comes online via HDC
+  - Manual executable selection fallback when auto-detection fails
+- **Enhanced TreeView** — Devices & Emulators sidebar:
+  - Two-section tree: "Devices" (physical) and "Emulators" (detected images)
+  - Running/stopped status icons for emulators
+  - Click device → opens Device Mirror; click stopped emulator → launches it
+- **Enhanced ArkUI Previewer** — significantly upgraded component preview:
+  - Full AST parser for ArkTS `build()` methods → recursive ArkNode tree
+  - 15+ layout containers: Column, Row, Stack, Grid, List, Flex, Scroll, Tabs, Navigation, RelativeContainer
+  - 20+ leaf components: Text, Button, Image, TextInput, TextArea, Toggle, Slider, Progress, Search, Checkbox, Radio, Rating, Divider, Blank, etc.
+  - CSS style mapping: width, height, padding, margin, backgroundColor, borderRadius, fontSize, fontColor, fontWeight, opacity, justifyContent, alignItems, layoutWeight, columnsTemplate, gap
+  - ArkUI enum mapping: Color.Red→#FF0000, FlexAlign.Center→center, FontWeight.Bold→bold
+  - Unit conversion: vp→px, fp→px, numeric→px
+  - 4 device frames: Phone (360×780), Tablet (600×400), Watch (192×192), Car (720×360)
+  - Hover-to-inspect component type labels
+  - Auto-refresh on save and when switching active .ets files
+  - @ComponentV2 struct detection
+- **New commands**: `Open Device Mirror`, `Launch Emulator`, `Stop Emulator`
+- **46 new unit tests** (total 334) covering ArkUI renderer, coordinate mapping, gesture detection, frame rate control, emulator detection
+
+### Changed
+- `uiInspector.ts` — extracted shared functions: `sendTouchInput`, `sendSwipeInput`, `sendKeyEvent`, `sendLongPress` (reused by both UI Inspector and Device Mirror)
+- `captureScreenshot()` — added JPEG format option for smaller/faster transfers
+- Preview panel — fixed duplicate event listener registration, now properly disposes listeners
+- `emulatorManager` — all `hdc` calls now use `resolveHdcPath()` instead of hardcoded `'hdc'`
+- `startEmulatorProcess` — properly awaits `withProgress`, supports cancellation token
+
 ## [0.2.4] - 2026-03-10
 
 ### Added

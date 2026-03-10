@@ -37,6 +37,9 @@ export function activate(context: vscode.ExtensionContext): HarmonyDevToolsAPI {
   // ---- Layer 1.5: Debug Configuration Provider ----
   registerDebugProvider(context);
 
+  // ---- Layer 1.8: DX Enhancement — real-time diagnostics, quick fix, perf lens ----
+  registerDxEnhancements(context);
+
   // ---- Layer 2: Command-triggered features — dynamic import ----
   registerLazyCommands(context);
 
@@ -175,6 +178,43 @@ function registerDebugProvider(context: vscode.ExtensionContext): void {
   });
 }
 
+// ---- Layer 1.8: DX Enhancement providers ----
+
+function registerDxEnhancements(context: vscode.ExtensionContext): void {
+  const config = vscode.workspace.getConfiguration('harmony');
+
+  // Real-time ArkTS diagnostics (any/unknown, state traps, perf anti-patterns)
+  if (config.get('enableDiagnostics', true)) {
+    import('./language/diagnosticProvider').then(({ createDiagnosticProvider }) => {
+      createDiagnosticProvider(context);
+    });
+
+    // Quick Fix code actions for all diagnostic rules (only meaningful with diagnostics)
+    import('./language/codeFixProvider').then(({ createCodeFixProvider }) => {
+      createCodeFixProvider(context);
+    });
+  }
+
+  // Performance insight CodeLens on build() / ForEach / struct
+  if (config.get('enablePerfLens', true)) {
+    import('./language/perfLens').then(({ createPerfLensProvider }) => {
+      createPerfLensProvider(context);
+    });
+  }
+
+  // Config file hover documentation (build-profile, module, app, oh-package)
+  import('./language/configHoverProvider').then(({ createConfigHoverProvider }) => {
+    createConfigHoverProvider(context);
+  });
+
+  // OHPM dependency insight (outdated deps, CodeLens on oh-package.json5)
+  if (config.get('enableOhpmInsight', true)) {
+    import('./project/ohpmInsight').then(({ createOhpmInsightProvider }) => {
+      createOhpmInsightProvider(context);
+    });
+  }
+}
+
 // ---- Layer 2: Command-triggered features ----
 
 function registerLazyCommands(context: vscode.ExtensionContext): void {
@@ -294,6 +334,21 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
   lazyCommand(COMMANDS.CHECK_API_COMPAT, async () => {
     const { checkApiCompatibility } = await import('./tools/apiCompatChecker');
     await checkApiCompatibility();
+  });
+
+  lazyCommand(COMMANDS.DEVICE_MIRROR, async () => {
+    const { openDeviceMirror } = await import('./device/mirrorPanel');
+    await openDeviceMirror();
+  });
+
+  lazyCommand(COMMANDS.LAUNCH_EMULATOR, async () => {
+    const { launchEmulator } = await import('./device/emulatorManager');
+    await launchEmulator();
+  });
+
+  lazyCommand(COMMANDS.STOP_EMULATOR, async () => {
+    const { stopEmulator } = await import('./device/emulatorManager');
+    await stopEmulator();
   });
 
   lazyCommand(COMMANDS.TAKE_SCREENSHOT, async () => {

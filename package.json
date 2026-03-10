@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Lightweight & powerful HarmonyOS development toolkit for VS Code",
-  "version": "0.2.4",
+  "version": "0.4.0",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -220,6 +220,24 @@
         "command": "harmony.checkApiCompat",
         "title": "Check API Compatibility",
         "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.openDeviceMirror",
+        "title": "Open Device Mirror",
+        "category": "HarmonyOS",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "harmony.launchEmulator",
+        "title": "Launch Emulator",
+        "category": "HarmonyOS",
+        "icon": "$(vm)"
+      },
+      {
+        "command": "harmony.stopEmulator",
+        "title": "Stop Emulator",
+        "category": "HarmonyOS",
+        "icon": "$(debug-stop)"
       }
     ],
     "viewsContainers": {
@@ -293,6 +311,11 @@
           "command": "harmony.buildAndRun",
           "when": "harmony.isHarmonyProject",
           "group": "navigation"
+        },
+        {
+          "command": "harmony.openDeviceMirror",
+          "when": "harmony.isHarmonyProject",
+          "group": "navigation"
         }
       ],
       "view/title": [
@@ -352,6 +375,21 @@
           "default": 5000,
           "minimum": 1000,
           "description": "Device list refresh interval in milliseconds"
+        },
+        "harmony.enableDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable real-time ArkTS diagnostics (any/unknown, state traps, perf anti-patterns)"
+        },
+        "harmony.enablePerfLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show performance insight CodeLens on build() and ForEach"
+        },
+        "harmony.enableOhpmInsight": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show OHPM dependency insights and outdated version warnings"
         }
       }
     },
