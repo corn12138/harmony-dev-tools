@@ -291,13 +291,15 @@ function checkPerformanceAntiPatterns(lines: string[], text: string): RawDiagnos
     for (const { pattern, message } of HEAVY_BUILD_PATTERNS) {
       const match = block.content.match(pattern);
       if (match && match.index !== undefined) {
-        const absoluteLine = block.startLine + block.content.substring(0, match.index).split('\n').length - 1;
-        const lineContent = lines[absoluteLine] || '';
-        const col = lineContent.indexOf(match[0]);
+        const beforeMatch = block.content.substring(0, match.index);
+        const lineOffset = beforeMatch.split('\n').length - 1;
+        const absoluteLine = block.startLine + lineOffset;
+        const lastNewlineIdx = beforeMatch.lastIndexOf('\n');
+        const col = lastNewlineIdx === -1 ? match.index : match.index - lastNewlineIdx - 1;
         diags.push({
           line: absoluteLine,
-          colStart: Math.max(col, 0),
-          colEnd: Math.max(col, 0) + match[0].length,
+          colStart: col,
+          colEnd: col + match[0].length,
           message: `build() 中检测到反模式：${message}`,
           severity: vscode.DiagnosticSeverity.Warning,
           code: DIAG_CODES.BUILD_HEAVY,

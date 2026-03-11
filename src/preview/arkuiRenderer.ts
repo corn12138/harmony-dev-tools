@@ -298,13 +298,21 @@ function extractBalancedBlock(code: string, startIdx: number): string | null {
   if (code[startIdx] !== '{') return null;
   let depth = 0;
   for (let i = startIdx; i < code.length; i++) {
-    if (code[i] === '{') depth++;
-    else if (code[i] === '}') { depth--; if (depth === 0) return code.substring(startIdx, i + 1); }
-    else if (code[i] === "'" || code[i] === '"' || code[i] === '`') {
+    if (code[i] === "'" || code[i] === '"' || code[i] === '`') {
       const q = code[i];
       i++;
-      while (i < code.length && code[i] !== q) { if (code[i] === '\\') i++; i++; }
+      while (i < code.length) {
+        if (code[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (code[i] === q) break;
+        i++;
+      }
+      continue;
     }
+    if (code[i] === '{') depth++;
+    else if (code[i] === '}') { depth--; if (depth === 0) return code.substring(startIdx, i + 1); }
   }
   return null;
 }
@@ -312,13 +320,21 @@ function extractBalancedBlock(code: string, startIdx: number): string | null {
 function findClosingParen(code: string, startIdx: number): number {
   let depth = 0;
   for (let i = startIdx; i < code.length; i++) {
-    if (code[i] === '(') depth++;
-    else if (code[i] === ')') { depth--; if (depth === 0) return i; }
-    else if (code[i] === "'" || code[i] === '"' || code[i] === '`') {
+    if (code[i] === "'" || code[i] === '"' || code[i] === '`') {
       const q = code[i];
       i++;
-      while (i < code.length && code[i] !== q) { if (code[i] === '\\') i++; i++; }
+      while (i < code.length) {
+        if (code[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (code[i] === q) break;
+        i++;
+      }
+      continue;
     }
+    if (code[i] === '(') depth++;
+    else if (code[i] === ')') { depth--; if (depth === 0) return i; }
   }
   return code.length;
 }
