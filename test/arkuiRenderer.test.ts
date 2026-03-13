@@ -322,11 +322,24 @@ struct Comp {
       expect(html).toContain('flex:1');
     });
 
-    it('should render unknown leaf component', () => {
+    it('should render unsupported component with warning badge', () => {
       const node: ArkNode = { type: 'Badge', params: '', styles: {}, children: [] };
       const html = renderToHtml(node);
-      expect(html).toContain('ark-unknown');
       expect(html).toContain('Badge');
+      expect(html).toContain('预览不支持');
+    });
+
+    it('should render leaf component without specific case as ark-unknown', () => {
+      const node: ArkNode = { type: 'Span', params: "'inline'", styles: {}, children: [] };
+      const html = renderToHtml(node);
+      expect(html).toContain('ark-unknown');
+      expect(html).toContain('Span');
+    });
+
+    it('should render unknown container component with data-type', () => {
+      const node: ArkNode = { type: 'MyCustomWidget', params: '', styles: {}, children: [] };
+      const html = renderToHtml(node);
+      expect(html).toContain('data-type="MyCustomWidget"');
     });
 
     it('should render Stack as grid', () => {
@@ -547,6 +560,31 @@ struct Comp {
       const tree = parseArkUI(source);
       expect(tree).toBeTruthy();
       expect(tree!.type).toBe('Navigation');
+    });
+
+    it('should preserve parsing after string literals in params and chained styles', () => {
+      const source = `
+@Component
+struct Comp {
+  build() {
+    Column() {
+      Text('Hello \\"ArkUI\\"')
+        .fontColor('#333')
+      TextInput({ placeholder: 'Enter {value}' })
+        .width('100%')
+    }
+    .backgroundColor('#fff')
+  }
+}`;
+      const tree = parseArkUI(source);
+      expect(tree).toBeTruthy();
+      expect(tree!.type).toBe('Column');
+      expect(tree!.styles.backgroundColor).toBe('#fff');
+      expect(tree!.children).toHaveLength(2);
+      expect(tree!.children[0].type).toBe('Text');
+      expect(tree!.children[0].styles.fontColor).toBe('#333');
+      expect(tree!.children[1].type).toBe('TextInput');
+      expect(tree!.children[1].styles.width).toBe('100%');
     });
   });
 });

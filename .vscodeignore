@@ -2,7 +2,6 @@
 .vscode-test/**
 src/**
 test/**
-config/**
 node_modules/**
 .claude/**
 docs/**

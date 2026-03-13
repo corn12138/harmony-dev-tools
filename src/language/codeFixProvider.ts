@@ -61,7 +61,9 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
       case DIAG_CODES.V1_V2_MIX:
         return this.fixV1V2Mix(document, diag);
       case DIAG_CODES.BUILD_HEAVY:
-        return []; // No auto-fix — requires manual refactoring
+        return [];
+      case DIAG_CODES.API_LEVEL:
+        return this.fixApiLevel(document, diag);
       default:
         return [];
     }
@@ -166,7 +168,6 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
     return [action];
   }
 
-  // Offer V1→V2 full migration
   private fixV1V2Mix(document: vscode.TextDocument, diag: vscode.Diagnostic): vscode.CodeAction[] {
     const action = new vscode.CodeAction(
       '执行 V1 → V2 装饰器迁移',
@@ -178,5 +179,35 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
     };
     action.diagnostics = [diag];
     return [action];
+  }
+
+  private fixApiLevel(document: vscode.TextDocument, diag: vscode.Diagnostic): vscode.CodeAction[] {
+    const actions: vscode.CodeAction[] = [];
+
+    const searchDoc = new vscode.CodeAction(
+      '查看官方文档 / Search Docs',
+      vscode.CodeActionKind.QuickFix,
+    );
+    const feature = document.getText(diag.range);
+    searchDoc.command = {
+      title: 'Search HarmonyOS Docs',
+      command: 'harmony.openDocs',
+      arguments: [feature],
+    };
+    searchDoc.diagnostics = [diag];
+    actions.push(searchDoc);
+
+    const checkCompat = new vscode.CodeAction(
+      '运行 API 兼容性检查 / Check API Compatibility',
+      vscode.CodeActionKind.QuickFix,
+    );
+    checkCompat.command = {
+      title: 'Check API Compatibility',
+      command: 'harmony.checkApiCompat',
+    };
+    checkCompat.diagnostics = [diag];
+    actions.push(checkCompat);
+
+    return actions;
   }
 }

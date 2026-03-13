@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { DEPRECATED_APIS } from '../utils/constants';
+import { getDecorators, getComponents, type DecoratorMeta, type ComponentMeta } from '../utils/metadata';
 
 export interface CompatIssue {
   message: string;
@@ -7,26 +8,6 @@ export interface CompatIssue {
   file?: string;
   line?: number;
 }
-
-const V2_DECORATORS = ['@ComponentV2', '@Local', '@Param', '@Once', '@Event', '@Monitor', '@Computed', '@Provider', '@Consumer', '@ObservedV2', '@Trace'];
-
-const API_LEVEL_FEATURES: Record<number, { decorators: string[]; components: string[]; apis: string[] }> = {
-  12: {
-    decorators: V2_DECORATORS,
-    components: ['CalendarPicker', 'ContainerSpan', 'SymbolGlyph', 'SymbolSpan', 'NodeContainer', 'ContentSlot', 'ComponentContent'],
-    apis: ['AppStorageV2', 'PersistenceV2'],
-  },
-  13: {
-    decorators: ['@Require'],
-    components: ['IsolatedComponent', 'NodeAdapter', 'EmbeddedComponent'],
-    apis: ['UIContext.getHostContext', 'UIContext.getMediaQuery'],
-  },
-  14: {
-    decorators: ['@Type'],
-    components: ['MarqueeV2', 'EffectComponent'],
-    apis: ['makeObserved', 'UIContext.getPromptAction', 'UIContext.getOverlayManager'],
-  },
-};
 
 export async function checkApiCompatibility(): Promise<void> {
   const folder = vscode.workspace.workspaceFolders?.[0];
@@ -36,7 +17,6 @@ export async function checkApiCompatibility(): Promise<void> {
   }
 
   const issues: CompatIssue[] = [];
-
   const apiVersion = await detectApiVersion(folder.uri);
 
   const hvigorIssues = await checkHvigorConfig(folder.uri, apiVersion);
@@ -49,74 +29,97 @@ export async function checkApiCompatibility(): Promise<void> {
     const relativePath = vscode.workspace.asRelativePath(file);
     const lines = text.split('\n');
 
-    // Check features against project API level
     if (apiVersion) {
-      for (const [apiStr, features] of Object.entries(API_LEVEL_FEATURES)) {
-        const requiredApi = parseInt(apiStr, 10);
-        if (apiVersion < requiredApi) {
-          for (const dec of features.decorators) {
-            const lineIdx = lines.findIndex(l => l.includes(dec));
-            if (lineIdx >= 0) {
-              issues.push({
-                message: `${dec} requires API ${requiredApi}+, but project targets API ${apiVersion}`,
-                severity: 'error',
-                file: relativePath,
-                line: lineIdx + 1,
-              });
-            }
-          }
-          for (const comp of features.components) {
-            const lineIdx = lines.findIndex(l => new RegExp(`\\b${comp}\\b`).test(l));
-            if (lineIdx >= 0) {
-              issues.push({
-                message: `${comp} requires API ${requiredApi}+, but project targets API ${apiVersion}`,
-                severity: 'warning',
-                file: relativePath,
-                line: lineIdx + 1,
-              });
-            }
-          }
-          for (const api of features.apis) {
-            const lineIdx = lines.findIndex(l => l.includes(api));
-            if (lineIdx >= 0) {
-              issues.push({
-                message: `${api} requires API ${requiredApi}+, but project targets API ${apiVersion}`,
-                severity: 'warning',
-                file: relativePath,
-                line: lineIdx + 1,
-              });
-            }
-          }
-        }
-      }
+      checkDecoratorsCompat(lines, relativePath, apiVersion, issues);
+      checkComponentsCompat(lines, relativePath, apiVersion, issues);
     }
 
-    // Check V1+V2 mixing
-    const hasV1 = ['@Component\n', '@Component ', '@State ', '@Prop '].some(p => text.includes(p));
-    const hasV2 = V2_DECORATORS.some(d => text.includes(d));
-    if (hasV1 && hasV2) {
-      issues.push({
-        message: 'V1 and V2 decorators are mixed in the same file. This is not recommended.',
-        severity: 'warning',
-        file: relativePath,
-      });
-    }
-
-    // Check deprecated APIs
-    for (const dep of DEPRECATED_APIS) {
-      const lineIdx = lines.findIndex(l => l.includes(dep.name));
-      if (lineIdx >= 0) {
-        issues.push({
-          message: `"${dep.name}" is deprecated since API ${dep.sinceApi}. Use "${dep.replacement}" instead.`,
-          severity: apiVersion && apiVersion >= dep.sinceApi + 2 ? 'warning' : 'info',
-          file: relativePath,
-          line: lineIdx + 1,
-        });
-      }
-    }
+    checkV1V2Mixing(text, relativePath, issues);
+    checkDeprecated(lines, relativePath, apiVersion, issues);
   }
 
   showResults(issues, apiVersion);
+}
+
+function checkDecoratorsCompat(
+  lines: string[],
+  filePath: string,
+  apiVersion: number,
+  issues: CompatIssue[],
+): void {
+  for (const dec of getDecorators()) {
+    if (dec.minApi <= apiVersion) continue;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(dec.name)) {
+        const migration = dec.migration
+          ? ` 迁移建议: 使用 ${dec.migration.to} 替代。`
+          : '';
+        issues.push({
+          message: `${dec.name} 需要 API ${dec.minApi}+，当前项目目标为 API ${apiVersion}。${migration}`,
+          severity: 'error',
+          file: filePath,
+          line: i + 1,
+        });
+        break;
+      }
+    }
+  }
+}
+
+function checkComponentsCompat(
+  lines: string[],
+  filePath: string,
+  apiVersion: number,
+  issues: CompatIssue[],
+): void {
+  for (const comp of getComponents()) {
+    if (comp.minApi <= apiVersion) continue;
+    const re = new RegExp(`\\b${comp.name}\\b`);
+    for (let i = 0; i < lines.length; i++) {
+      if (re.test(lines[i])) {
+        issues.push({
+          message: `${comp.name} 需要 API ${comp.minApi}+，当前项目目标为 API ${apiVersion}。`,
+          severity: 'warning',
+          file: filePath,
+          line: i + 1,
+        });
+        break;
+      }
+    }
+  }
+}
+
+function checkV1V2Mixing(text: string, filePath: string, issues: CompatIssue[]): void {
+  const v1Decorators = getDecorators().filter(d => d.stateModel === 'v1');
+  const v2Decorators = getDecorators().filter(d => d.stateModel === 'v2');
+  const hasV1 = v1Decorators.some(d => text.includes(d.name));
+  const hasV2 = v2Decorators.some(d => text.includes(d.name));
+  if (hasV1 && hasV2) {
+    issues.push({
+      message: '同一文件中混用了 V1 和 V2 装饰器，建议统一迁移到 V2。运行 "HarmonyOS: Migrate V1 → V2 Decorators" 一键迁移。',
+      severity: 'warning',
+      file: filePath,
+    });
+  }
+}
+
+function checkDeprecated(
+  lines: string[],
+  filePath: string,
+  apiVersion: number | null,
+  issues: CompatIssue[],
+): void {
+  for (const dep of DEPRECATED_APIS) {
+    const lineIdx = lines.findIndex(l => l.includes(dep.name));
+    if (lineIdx >= 0) {
+      issues.push({
+        message: `"${dep.name}" 自 API ${dep.sinceApi} 起已废弃，请使用 "${dep.replacement}" 替代。`,
+        severity: apiVersion && apiVersion >= dep.sinceApi + 2 ? 'warning' : 'info',
+        file: filePath,
+        line: lineIdx + 1,
+      });
+    }
+  }
 }
 
 function showResults(issues: CompatIssue[], apiVersion: number | null): void {
@@ -130,7 +133,6 @@ function showResults(issues: CompatIssue[], apiVersion: number | null): void {
   channel.clear();
   channel.appendLine(`=== HarmonyOS API Compatibility Check ===`);
   channel.appendLine(`Target API: ${apiVersion ?? 'unknown'}`);
-  channel.appendLine(`Latest available: API 14 (HarmonyOS 5.0.2)`);
   channel.appendLine(`Issues found: ${issues.length}`);
   channel.appendLine('');
 
@@ -165,16 +167,15 @@ function showResults(issues: CompatIssue[], apiVersion: number | null): void {
     channel.appendLine('');
   }
 
-  // Upgrade suggestions
-  if (apiVersion && apiVersion < 14) {
-    channel.appendLine(`--- UPGRADE SUGGESTIONS ---`);
-    if (apiVersion < 13) {
-      channel.appendLine(`  [TIP] Upgrade to API 13 (HarmonyOS 5.0.1) for: @Require decorator, IsolatedComponent, enhanced UIContext APIs`);
+  if (apiVersion) {
+    const nextApis = buildUpgradeSuggestions(apiVersion);
+    if (nextApis.length) {
+      channel.appendLine(`--- UPGRADE SUGGESTIONS ---`);
+      for (const tip of nextApis) {
+        channel.appendLine(`  [TIP] ${tip}`);
+      }
+      channel.appendLine('');
     }
-    if (apiVersion < 14) {
-      channel.appendLine(`  [TIP] Upgrade to API 14 (HarmonyOS 5.0.2) for: @Type decorator, makeObserved(), enhanced drag-and-drop, EffectComponent`);
-    }
-    channel.appendLine('');
   }
 
   channel.show();
@@ -182,6 +183,30 @@ function showResults(issues: CompatIssue[], apiVersion: number | null): void {
   vscode.window.showWarningMessage(
     `Found ${errors.length} error(s), ${warnings.length} warning(s), ${infos.length} info(s). See Output panel.`
   );
+}
+
+function buildUpgradeSuggestions(apiVersion: number): string[] {
+  const tips: string[] = [];
+  const decorators = getDecorators();
+  const components = getComponents();
+
+  const nextLevels = [...new Set([
+    ...decorators.map(d => d.minApi),
+    ...components.map(c => c.minApi),
+  ])].filter(v => v > apiVersion).sort((a, b) => a - b);
+
+  for (const level of nextLevels) {
+    const newDecs = decorators.filter(d => d.minApi === level).map(d => d.name);
+    const newComps = components.filter(c => c.minApi === level).map(c => c.name);
+    const parts: string[] = [];
+    if (newDecs.length) parts.push(`装饰器: ${newDecs.join(', ')}`);
+    if (newComps.length) parts.push(`组件: ${newComps.slice(0, 5).join(', ')}${newComps.length > 5 ? ` +${newComps.length - 5}` : ''}`);
+    if (parts.length) {
+      tips.push(`升级到 API ${level} 可获得: ${parts.join(' | ')}`);
+    }
+  }
+
+  return tips;
 }
 
 export async function detectApiVersion(rootUri: vscode.Uri): Promise<number | null> {

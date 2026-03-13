@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { getDecorators, getComponents, apiLabel, type DecoratorMeta } from '../utils/metadata';
 
 // ---------------------------------------------------------------------------
 // Diagnostic codes — referenced by codeFixProvider for Quick Fix matching
@@ -13,6 +14,7 @@ export const DIAG_CODES = {
   LINK_IN_V2: 'arkts-link-in-v2',
   FOREACH_PERF: 'arkts-foreach-perf',
   BUILD_HEAVY: 'arkts-build-heavy',
+  API_LEVEL: 'arkts-api-level',
 } as const;
 
 export type DiagCode = (typeof DIAG_CODES)[keyof typeof DIAG_CODES];
@@ -58,9 +60,26 @@ const HEAVY_BUILD_PATTERNS: Array<{ pattern: RegExp; message: string }> = [
 export function createDiagnosticProvider(context: vscode.ExtensionContext): vscode.Disposable {
   const collection = vscode.languages.createDiagnosticCollection('arkts-lint');
 
+  let cachedApiLevel: number | undefined;
+
+  const detectProjectApi = async () => {
+    const rootUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+    if (!rootUri) return;
+    try {
+      const bp = vscode.Uri.joinPath(rootUri, 'build-profile.json5');
+      const raw = Buffer.from(await vscode.workspace.fs.readFile(bp)).toString('utf8');
+      const m = raw.match(/["']?compileSdkVersion["']?\s*[:=]\s*(\d+)/);
+      if (m) { cachedApiLevel = parseInt(m[1], 10); return; }
+      const m2 = raw.match(/["']?compatibleSdkVersion["']?\s*[:=]\s*(\d+)/);
+      if (m2) { cachedApiLevel = parseInt(m2[1], 10); }
+    } catch { /* no build-profile */ }
+  };
+
+  detectProjectApi();
+
   const runDiag = (doc: vscode.TextDocument) => {
     if (doc.languageId !== 'arkts' && !doc.fileName.endsWith('.ets')) return;
-    const diagnostics = analyzeDocument(doc);
+    const diagnostics = analyzeDocument(doc, cachedApiLevel);
     collection.set(doc.uri, diagnostics);
   };
 
@@ -68,12 +87,17 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
   const onSave = vscode.workspace.onDidSaveTextDocument(runDiag);
   const onChange = vscode.workspace.onDidChangeTextDocument((e) => runDiag(e.document));
 
-  // Run on already-open editors
+  const onConfigChange = vscode.workspace.onDidSaveTextDocument((doc) => {
+    if (doc.fileName.endsWith('build-profile.json5')) {
+      detectProjectApi();
+    }
+  });
+
   if (vscode.window.activeTextEditor) {
     runDiag(vscode.window.activeTextEditor.document);
   }
 
-  const disposable = vscode.Disposable.from(collection, onOpen, onSave, onChange);
+  const disposable = vscode.Disposable.from(collection, onOpen, onSave, onChange, onConfigChange);
   context.subscriptions.push(disposable);
   return disposable;
 }
@@ -91,20 +115,22 @@ export interface RawDiagnostic {
   code: DiagCode;
 }
 
-export function analyzeText(text: string): RawDiagnostic[] {
+export function analyzeText(text: string, projectApiLevel?: number): RawDiagnostic[] {
   const lines = text.split('\n');
   const diags: RawDiagnostic[] = [];
 
   diags.push(...checkStrictTypes(lines));
   diags.push(...checkStateManagement(lines, text));
   diags.push(...checkPerformanceAntiPatterns(lines, text));
+  if (projectApiLevel) {
+    diags.push(...checkApiLevelUsage(lines, projectApiLevel));
+  }
 
   return diags;
 }
 
-// Private — used internally by createDiagnosticProvider
-function analyzeDocument(doc: vscode.TextDocument): vscode.Diagnostic[] {
-  const raw = analyzeText(doc.getText());
+function analyzeDocument(doc: vscode.TextDocument, projectApiLevel?: number): vscode.Diagnostic[] {
+  const raw = analyzeText(doc.getText(), projectApiLevel);
   return raw.map((r) => {
     const range = new vscode.Range(r.line, r.colStart, r.line, r.colEnd);
     const d = new vscode.Diagnostic(range, r.message, r.severity);
@@ -303,6 +329,58 @@ function checkPerformanceAntiPatterns(lines: string[], text: string): RawDiagnos
           message: `build() 中检测到反模式：${message}`,
           severity: vscode.DiagnosticSeverity.Warning,
           code: DIAG_CODES.BUILD_HEAVY,
+        });
+      }
+    }
+  }
+
+  return diags;
+}
+
+// ---------------------------------------------------------------------------
+// Rule 4: API level usage — warn when using features above project target
+// ---------------------------------------------------------------------------
+
+function checkApiLevelUsage(lines: string[], apiLevel: number): RawDiagnostic[] {
+  const diags: RawDiagnostic[] = [];
+
+  for (const dec of getDecorators()) {
+    if (dec.minApi <= apiLevel) continue;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+      const idx = line.indexOf(dec.name);
+      if (idx >= 0) {
+        const migration = dec.migration ? ` 建议: ${dec.migration.hint}` : '';
+        diags.push({
+          line: i,
+          colStart: idx,
+          colEnd: idx + dec.name.length,
+          message: `${dec.name} 需要 ${apiLabel(dec.minApi)}，当前项目目标为 API ${apiLevel}。${migration}`,
+          severity: vscode.DiagnosticSeverity.Error,
+          code: DIAG_CODES.API_LEVEL,
+        });
+      }
+    }
+  }
+
+  for (const comp of getComponents()) {
+    if (comp.minApi <= apiLevel) continue;
+    const re = new RegExp(`\\b${comp.name}\\s*\\(`);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+      const match = line.match(re);
+      if (match && match.index !== undefined) {
+        diags.push({
+          line: i,
+          colStart: match.index,
+          colEnd: match.index + comp.name.length,
+          message: `${comp.name} 需要 ${apiLabel(comp.minApi)}，当前项目目标为 API ${apiLevel}。`,
+          severity: vscode.DiagnosticSeverity.Warning,
+          code: DIAG_CODES.API_LEVEL,
         });
       }
     }

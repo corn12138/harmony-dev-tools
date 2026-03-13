@@ -4,6 +4,8 @@
  * that approximates the ArkUI layout.
  */
 
+import { getComponentByName, apiLabel } from '../utils/metadata';
+
 export interface ArkNode {
   type: string;
   params: string;
@@ -140,15 +142,18 @@ const horizontalAlignMap: Record<string, string> = {
 
 /** Render an ArkNode tree to HTML. */
 export function renderToHtml(node: ArkNode, depth: number = 0): string {
+  const unsupported = checkPreviewSupport(node.type);
+  if (unsupported) {
+    return renderUnsupported(node, unsupported, depth);
+  }
+
   const css = buildCss(node);
   const label = `<div class="ark-label">${esc(node.type)}</div>`;
 
-  // Leaf components
   if (isLeafComponent(node.type)) {
     return renderLeaf(node, css, depth);
   }
 
-  // Container components
   const childrenHtml = node.children.map(c => renderToHtml(c, depth + 1)).join('\n');
   return `<div class="ark-node" style="${css}" data-type="${esc(node.type)}">
   ${label}
@@ -387,4 +392,29 @@ function extractObjectField(params: string, field: string): string | null {
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// ---------------------------------------------------------------------------
+// Preview support check — returns a reason string if unsupported, else null
+// ---------------------------------------------------------------------------
+
+function checkPreviewSupport(type: string): string | null {
+  const meta = getComponentByName(type);
+  if (!meta) return null;
+  if (meta.previewSupported) return null;
+  const tag = apiLabel(meta.minApi);
+  const prefix = tag ? `[${tag}] ` : '';
+  return `${prefix}${meta.zh || meta.en}`;
+}
+
+function renderUnsupported(node: ArkNode, reason: string, depth: number): string {
+  const childrenHtml = node.children.length
+    ? node.children.map(c => renderToHtml(c, depth + 1)).join('\n')
+    : '';
+  const badge = `<div style="background:#fff3e0;border:1px dashed #ff9800;border-radius:6px;padding:6px 10px;margin:4px 0;font-size:11px;color:#e65100;">` +
+    `<span style="font-weight:600;">${esc(node.type)}</span>` +
+    `<span style="color:#bf360c;margin-left:6px;">⚠ 预览不支持 / Preview unsupported</span>` +
+    `<div style="color:#795548;font-size:10px;margin-top:2px;">${esc(reason)}</div>` +
+    `</div>`;
+  return childrenHtml ? `${badge}<div style="opacity:0.6">${childrenHtml}</div>` : badge;
 }

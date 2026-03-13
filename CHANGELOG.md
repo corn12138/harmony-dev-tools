@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.5.0] - 2026-03-12
+
+### Added
+- **OHPM Dependency Management** (`deps.ts`) — full dependency management UI:
+  - View all outdated dependencies with current / latest version comparison
+  - One-click update single dependency or batch update all outdated deps
+  - Add new dependency from known OHPM packages list or custom input
+  - Run `ohpm install` directly from command palette
+- **Component & Decorator Metadata System** (`config/components.json`, `config/decorators.json`, `metadata.ts`):
+  - 98 ArkUI components with category, minApi, previewSupported, bilingual docs, docUrl
+  - 30 ArkTS decorators with stateModel (v1/v2/common), migration hints, docUrl
+  - Singleton loader with in-memory caching for zero-cost repeated access
+  - Consumed by completionProvider, hoverProvider, diagnosticProvider, apiCompatChecker, docsSearch, arkuiRenderer
+- **Enhanced Documentation Search** (`docsSearch.ts`) — now powered by metadata:
+  - Decorators grouped by state model (V1 / V2 / Common)
+  - Components grouped by category (Layout / Basic / Media / Canvas / Menu)
+  - API level tags on every item
+  - Fallback to Huawei developer site search for unlisted keywords
+- **ArkUI Preview — unsupported component badges**:
+  - Components with `previewSupported: false` now render a clear warning badge
+  - Shows component name, "Preview unsupported" label, and Chinese description
+
+### Fixed
+- **Critical packaging bug**: `config/` directory was excluded from VSIX by `.vscodeignore`, causing runtime crash when metadata was loaded
+- **Critical path resolution bug**: `metadata.ts` used `'..', '..'` from `dist/` — off by one level, could never find `config/` in production
+- **Test failure**: Badge component test expected `ark-unknown` but Badge is now registered in `components.json` with `previewSupported: false`; updated test to match new unsupported-preview rendering behavior
+
+### Changed
+- `completionProvider.ts` — now reads decorators and components from metadata JSON instead of hardcoded arrays
+- `hoverProvider.ts` — decorator hover docs now sourced from metadata with docUrl links
+- `diagnosticProvider.ts` — API level checks driven by metadata, V1/V2 detection uses metadata stateModel
+- `apiCompatChecker.ts` — decorator and component compat checks driven by metadata
+- `arkuiRenderer.ts` — preview support check uses component metadata `previewSupported` flag
+
 ## [0.4.0] - 2026-03-10
 
 ### Added — Developer Experience Enhancement / 开发者体验增强

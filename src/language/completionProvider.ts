@@ -1,34 +1,5 @@
 import * as vscode from 'vscode';
-import { ARKTS_DECORATORS } from '../utils/constants';
-
-const ARKUI_COMPONENTS = [
-  // Layout containers
-  'Column', 'Row', 'Stack', 'Flex', 'Grid', 'GridItem', 'GridRow', 'GridCol',
-  'List', 'ListItem', 'ListItemGroup',
-  'Scroll', 'Tabs', 'TabContent', 'Swiper', 'Navigation', 'NavRouter', 'NavDestination',
-  'WaterFlow', 'FlowItem', 'RelativeContainer', 'SideBarContainer', 'FolderStack',
-  // Basic components
-  'Text', 'Span', 'Button', 'Image', 'ImageSpan', 'TextInput', 'TextArea', 'Toggle',
-  'Radio', 'Checkbox', 'CheckboxGroup', 'Select', 'Slider', 'Progress', 'LoadingProgress',
-  'Divider', 'Blank', 'Search', 'Rating', 'Stepper', 'StepperItem',
-  'Badge', 'Marquee', 'Counter', 'DatePicker', 'TimePicker', 'TextPicker', 'TextClock', 'TextTimer',
-  'AlphabetIndexer', 'Panel', 'Refresh', 'PatternLock',
-  // Media & Web
-  'Web', 'RichText', 'RichEditor', 'Video', 'XComponent',
-  // Canvas & Drawing
-  'Canvas', 'Circle', 'Ellipse', 'Line', 'Path', 'Polygon', 'Polyline', 'Rect', 'Shape',
-  // Menu & Dialog
-  'Menu', 'MenuItem', 'MenuItemGroup',
-  // API 12+ components
-  'CalendarPicker', 'ContainerSpan', 'SymbolGlyph', 'SymbolSpan',
-  'NodeContainer', 'ContentSlot', 'ComponentContent',
-  // API 13+ components
-  'IsolatedComponent', 'NodeAdapter', 'EmbeddedComponent',
-  'Chip', 'ChipGroup', 'SegmentButton',
-  // API 14+ components
-  'EffectComponent', 'MarqueeV2',
-  'FormLink', 'GridObjectSortComponent',
-];
+import { getDecorators, getComponents, apiLabel } from '../utils/metadata';
 
 const LIFECYCLE_METHODS = [
   { name: 'aboutToAppear', doc: 'Called before the component build function is executed' },
@@ -51,12 +22,13 @@ export function provideCompletionItems(
   const charBefore = lineText.charAt(position.character - 1);
   const items: vscode.CompletionItem[] = [];
 
-  // Decorator completions after @
   if (charBefore === '@') {
-    for (const dec of ARKTS_DECORATORS) {
-      const name = dec.slice(1); // Remove @
+    for (const dec of getDecorators()) {
+      const name = dec.name.slice(1);
       const item = new vscode.CompletionItem(name, vscode.CompletionItemKind.Keyword);
-      item.detail = `ArkTS Decorator`;
+      const tag = apiLabel(dec.minApi);
+      item.detail = tag ? `ArkTS Decorator (${tag})` : 'ArkTS Decorator';
+      item.documentation = new vscode.MarkdownString(`${dec.zh}\n\n${dec.en}`);
       item.insertText = name;
       item.sortText = '0' + name;
       items.push(item);
@@ -64,15 +36,19 @@ export function provideCompletionItems(
     return items;
   }
 
-  // ArkUI component completions
-  for (const comp of ARKUI_COMPONENTS) {
-    const item = new vscode.CompletionItem(comp, vscode.CompletionItemKind.Class);
-    item.detail = 'ArkUI Component';
-    item.insertText = new vscode.SnippetString(`${comp}($1) {\n  $0\n}`);
+  for (const comp of getComponents()) {
+    const item = new vscode.CompletionItem(comp.name, vscode.CompletionItemKind.Class);
+    const tag = apiLabel(comp.minApi);
+    item.detail = tag ? `ArkUI Component (${tag})` : 'ArkUI Component';
+    item.documentation = new vscode.MarkdownString(`${comp.zh}\n\n${comp.en}`);
+    if (comp.hasChildren) {
+      item.insertText = new vscode.SnippetString(`${comp.name}($1) {\n  $0\n}`);
+    } else {
+      item.insertText = new vscode.SnippetString(`${comp.name}($1)`);
+    }
     items.push(item);
   }
 
-  // Lifecycle method completions
   for (const method of LIFECYCLE_METHODS) {
     const item = new vscode.CompletionItem(method.name, vscode.CompletionItemKind.Method);
     item.detail = 'Lifecycle';
@@ -81,7 +57,6 @@ export function provideCompletionItems(
     items.push(item);
   }
 
-  // $r() resource reference completion
   if (lineText.includes("$r('") || lineText.includes('$r("')) {
     return provideResourceCompletions(document);
   }

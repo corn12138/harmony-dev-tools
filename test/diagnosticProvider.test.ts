@@ -177,6 +177,22 @@ describe('diagnosticProvider — analyzeText', () => {
       const diags = analyzeText(code);
       expect(diags.filter((d) => d.code === DIAG_CODES.BUILD_HEAVY)).toHaveLength(0);
     });
+
+    it('should report the exact column for heavy patterns in nested build blocks', () => {
+      const code = [
+        'build() {',
+        '  Column() {',
+        '    console.log("rendering")',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      const heavy = diags.find((d) => d.code === DIAG_CODES.BUILD_HEAVY && d.message.includes('console'));
+      expect(heavy).toBeDefined();
+      expect(heavy!.line).toBe(2);
+      expect(heavy!.colStart).toBe(4);
+      expect(heavy!.colEnd).toBe(16);
+    });
   });
 });
 
