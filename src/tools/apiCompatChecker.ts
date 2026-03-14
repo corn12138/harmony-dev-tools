@@ -1,5 +1,12 @@
 import * as vscode from 'vscode';
 import { DEPRECATED_APIS } from '../utils/constants';
+import { getPreferredWorkspaceFolder } from '../utils/workspace';
+import {
+  detectHarmonySdkFromBuildProfile,
+  getHarmonyReleaseByApi,
+  LATEST_HARMONY_RELEASE,
+  type DetectedHarmonySdk,
+} from '../utils/harmonySdk';
 import { getDecorators, getComponents, type DecoratorMeta, type ComponentMeta } from '../utils/metadata';
 
 export interface CompatIssue {
@@ -10,19 +17,24 @@ export interface CompatIssue {
 }
 
 export async function checkApiCompatibility(): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = getPreferredWorkspaceFolder();
   if (!folder) {
     vscode.window.showWarningMessage('No workspace folder open.');
     return;
   }
 
   const issues: CompatIssue[] = [];
-  const apiVersion = await detectApiVersion(folder.uri);
+  const targetSdk = await detectApiTarget(folder.uri);
+  const apiVersion = targetSdk?.apiLevel ?? null;
 
   const hvigorIssues = await checkHvigorConfig(folder.uri, apiVersion);
   issues.push(...hvigorIssues);
 
-  const etsFiles = await vscode.workspace.findFiles('**/*.ets', '**/node_modules/**', 100);
+  const etsFiles = await vscode.workspace.findFiles(
+    new vscode.RelativePattern(folder, '**/*.ets'),
+    '**/node_modules/**',
+    100,
+  );
   for (const file of etsFiles) {
     const content = await vscode.workspace.fs.readFile(file);
     const text = Buffer.from(content).toString('utf8');
@@ -38,7 +50,7 @@ export async function checkApiCompatibility(): Promise<void> {
     checkDeprecated(lines, relativePath, apiVersion, issues);
   }
 
-  showResults(issues, apiVersion);
+  showResults(issues, targetSdk);
 }
 
 function checkDecoratorsCompat(
@@ -122,9 +134,11 @@ function checkDeprecated(
   }
 }
 
-function showResults(issues: CompatIssue[], apiVersion: number | null): void {
+function showResults(issues: CompatIssue[], targetSdk: DetectedHarmonySdk | null): void {
+  const apiVersion = targetSdk?.apiLevel ?? null;
+
   if (issues.length === 0) {
-    const apiStr = apiVersion ? `API ${apiVersion}` : 'unknown API version';
+    const apiStr = formatTargetSdkSummary(targetSdk);
     vscode.window.showInformationMessage(`No compatibility issues found. Project targets ${apiStr}.`);
     return;
   }
@@ -132,7 +146,7 @@ function showResults(issues: CompatIssue[], apiVersion: number | null): void {
   const channel = vscode.window.createOutputChannel('HarmonyOS Compatibility');
   channel.clear();
   channel.appendLine(`=== HarmonyOS API Compatibility Check ===`);
-  channel.appendLine(`Target API: ${apiVersion ?? 'unknown'}`);
+  channel.appendLine(`Target SDK: ${formatTargetSdkSummary(targetSdk)}`);
   channel.appendLine(`Issues found: ${issues.length}`);
   channel.appendLine('');
 
@@ -206,22 +220,24 @@ function buildUpgradeSuggestions(apiVersion: number): string[] {
     }
   }
 
+  if (apiVersion < LATEST_HARMONY_RELEASE.apiLevel) {
+    tips.push(`官方最新公开版本: ${LATEST_HARMONY_RELEASE.label} (${LATEST_HARMONY_RELEASE.sdkVersion})。`);
+  }
+
   return tips;
 }
 
 export async function detectApiVersion(rootUri: vscode.Uri): Promise<number | null> {
+  const target = await detectApiTarget(rootUri);
+  return target?.apiLevel ?? null;
+}
+
+export async function detectApiTarget(rootUri: vscode.Uri): Promise<DetectedHarmonySdk | null> {
   try {
     const buildProfile = vscode.Uri.joinPath(rootUri, 'build-profile.json5');
     const content = await vscode.workspace.fs.readFile(buildProfile);
     const text = Buffer.from(content).toString('utf8');
-
-    const match = text.match(/["']?compileSdkVersion["']?\s*[:=]\s*(\d+)/);
-    if (match) return parseInt(match[1], 10);
-
-    const compatMatch = text.match(/["']?compatibleSdkVersion["']?\s*[:=]\s*(\d+)/);
-    if (compatMatch) return parseInt(compatMatch[1], 10);
-
-    return null;
+    return detectHarmonySdkFromBuildProfile(text);
   } catch {
     return null;
   }
@@ -238,16 +254,16 @@ async function checkHvigorConfig(rootUri: vscode.Uri, apiVersion: number | null)
     if (apiVersion && apiVersion >= 12) {
       if (!text.includes('modelVersion')) {
         issues.push({
-          message: 'hvigor-config.json5 is missing "modelVersion" field (required for API 12+). Add: "modelVersion": "5.0.0"',
+          message: 'hvigor-config.json5 is missing "modelVersion" field (required for API 12+). Add a semver value such as "5.0.0".',
           severity: 'warning',
           file: 'hvigor/hvigor-config.json5',
         });
-      } else if (apiVersion >= 14) {
-        const versionMatch = text.match(/["']?modelVersion["']?\s*[:=]\s*["'](\d+\.\d+\.\d+)["']/);
-        if (versionMatch && versionMatch[1] < '5.0.2') {
+      } else {
+        const versionMatch = text.match(/["']?modelVersion["']?\s*[:=]\s*["']([^"']+)["']/);
+        if (versionMatch && !/^\d+\.\d+\.\d+$/.test(versionMatch[1])) {
           issues.push({
-            message: `modelVersion "${versionMatch[1]}" may be outdated for API ${apiVersion}. Consider updating to "5.0.2".`,
-            severity: 'info',
+            message: `modelVersion "${versionMatch[1]}" is not a valid semantic version. Confirm it against your installed hvigor toolchain.`,
+            severity: 'warning',
             file: 'hvigor/hvigor-config.json5',
           });
         }
@@ -274,4 +290,15 @@ async function checkHvigorConfig(rootUri: vscode.Uri, apiVersion: number | null)
   }
 
   return issues;
+}
+
+function formatTargetSdkSummary(targetSdk: DetectedHarmonySdk | null): string {
+  if (!targetSdk) {
+    return 'unknown API version';
+  }
+
+  const release = targetSdk.apiLevel ? getHarmonyReleaseByApi(targetSdk.apiLevel) : undefined;
+  const apiPart = targetSdk.apiLevel ? `API ${targetSdk.apiLevel}` : 'unknown API';
+  const releasePart = release ? `, ${release.label}` : '';
+  return `${targetSdk.field} = ${targetSdk.rawValue} (${apiPart}${releasePart})`;
 }

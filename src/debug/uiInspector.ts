@@ -1,8 +1,4 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { resolveHdcPath } from '../utils/config';
-
-const execAsync = promisify(exec);
+import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 
 /** A node in the UI component tree */
 export interface UINode {
@@ -21,20 +17,19 @@ export interface UINode {
  * ArkUI inspector protocol when available.
  */
 export async function dumpUITree(deviceId?: string): Promise<UINode | null> {
-  const hdc = await resolveHdcPath();
-  const target = deviceId ? `-t ${deviceId}` : '';
+  const targetArgs = buildHdcTargetArgs(deviceId);
 
   try {
     // Try ArkUI dump first (more structured)
-    const { stdout } = await execAsync(
-      `${hdc} ${target} shell "aa dump -a"`,
+    const { stdout } = await execHdc(
+      [...targetArgs, 'shell', 'aa dump -a'],
       { timeout: 5000 }
     );
 
     if (stdout.includes('error') || stdout.trim().length < 10) {
       // Fallback: try hidumper
-      const { stdout: fallback } = await execAsync(
-        `${hdc} ${target} shell "hidumper -s WindowManagerService -a -a"`,
+      const { stdout: fallback } = await execHdc(
+        [...targetArgs, 'shell', 'hidumper -s WindowManagerService -a -a'],
         { timeout: 5000 }
       );
       return parseHidumperOutput(fallback);
@@ -48,15 +43,14 @@ export async function dumpUITree(deviceId?: string): Promise<UINode | null> {
 
 /** Take a screenshot from device and return base64 PNG */
 export async function captureScreenshot(deviceId?: string, format: 'png' | 'jpeg' = 'png'): Promise<string | null> {
-  const hdc = await resolveHdcPath();
-  const target = deviceId ? `-t ${deviceId}` : '';
+  const targetArgs = buildHdcTargetArgs(deviceId);
   const ext = format === 'jpeg' ? 'jpeg' : 'png';
   const tmpDevice = `/data/local/tmp/screenshot.${ext}`;
   const tmpLocal = `/tmp/harmony_screenshot_${Date.now()}.${ext}`;
 
   try {
-    await execAsync(`${hdc} ${target} shell "snapshot_display -f ${tmpDevice}"`, { timeout: 5000 });
-    await execAsync(`${hdc} ${target} file recv ${tmpDevice} ${tmpLocal}`, { timeout: 5000 });
+    await execHdc([...targetArgs, 'shell', `snapshot_display -f ${tmpDevice}`], { timeout: 5000 });
+    await execHdc([...targetArgs, 'file', 'recv', tmpDevice, tmpLocal], { timeout: 5000 });
     const fs = await import('fs/promises');
     const buffer = await fs.readFile(tmpLocal);
     await fs.unlink(tmpLocal).catch(() => {});
@@ -68,20 +62,18 @@ export async function captureScreenshot(deviceId?: string, format: 'png' | 'jpeg
 
 /** Send a touch/click event to the device */
 export async function sendTouchInput(x: number, y: number, deviceId?: string): Promise<void> {
-  const hdc = await resolveHdcPath();
-  const target = deviceId ? `-t ${deviceId}` : '';
+  const targetArgs = buildHdcTargetArgs(deviceId);
   try {
-    await execAsync(`${hdc} ${target} shell "uitest uiInput click ${Math.round(x)} ${Math.round(y)}"`, { timeout: 3000 });
+    await execHdc([...targetArgs, 'shell', `uitest uiInput click ${Math.round(x)} ${Math.round(y)}`], { timeout: 3000 });
   } catch { /* best effort */ }
 }
 
 /** Send a swipe gesture to the device */
 export async function sendSwipeInput(x1: number, y1: number, x2: number, y2: number, durationMs: number = 500, deviceId?: string): Promise<void> {
-  const hdc = await resolveHdcPath();
-  const target = deviceId ? `-t ${deviceId}` : '';
+  const targetArgs = buildHdcTargetArgs(deviceId);
   try {
-    await execAsync(
-      `${hdc} ${target} shell "uitest uiInput swipe ${Math.round(x1)} ${Math.round(y1)} ${Math.round(x2)} ${Math.round(y2)} ${durationMs}"`,
+    await execHdc(
+      [...targetArgs, 'shell', `uitest uiInput swipe ${Math.round(x1)} ${Math.round(y1)} ${Math.round(x2)} ${Math.round(y2)} ${durationMs}`],
       { timeout: 5000 }
     );
   } catch { /* best effort */ }
@@ -89,20 +81,18 @@ export async function sendSwipeInput(x1: number, y1: number, x2: number, y2: num
 
 /** Send a key event to the device */
 export async function sendKeyEvent(key: string, deviceId?: string): Promise<void> {
-  const hdc = await resolveHdcPath();
-  const target = deviceId ? `-t ${deviceId}` : '';
+  const targetArgs = buildHdcTargetArgs(deviceId);
   try {
-    await execAsync(`${hdc} ${target} shell "uitest uiInput keyEvent ${key}"`, { timeout: 3000 });
+    await execHdc([...targetArgs, 'shell', `uitest uiInput keyEvent ${key}`], { timeout: 3000 });
   } catch { /* best effort */ }
 }
 
 /** Send a long-press event to the device */
 export async function sendLongPress(x: number, y: number, durationMs: number = 1000, deviceId?: string): Promise<void> {
-  const hdc = await resolveHdcPath();
-  const target = deviceId ? `-t ${deviceId}` : '';
+  const targetArgs = buildHdcTargetArgs(deviceId);
   try {
-    await execAsync(
-      `${hdc} ${target} shell "uitest uiInput longClick ${Math.round(x)} ${Math.round(y)} ${durationMs}"`,
+    await execHdc(
+      [...targetArgs, 'shell', `uitest uiInput longClick ${Math.round(x)} ${Math.round(y)} ${durationMs}`],
       { timeout: durationMs + 3000 }
     );
   } catch { /* best effort */ }

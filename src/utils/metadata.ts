@@ -36,7 +36,18 @@ let _decorators: DecoratorMeta[] | undefined;
 let _components: ComponentMeta[] | undefined;
 
 function configDir(): string {
-  return path.resolve(__dirname, '..', 'config');
+  const candidates = [
+    path.resolve(__dirname, '..', '..', 'config'),
+    path.resolve(__dirname, '..', 'config'),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return candidates[0];
 }
 
 function loadJson<T>(filename: string): T[] {

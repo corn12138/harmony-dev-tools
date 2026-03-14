@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { DEPRECATED_APIS } from '../src/utils/constants';
+import { detectHarmonySdkFromBuildProfile } from '../src/utils/harmonySdk';
 
 /**
  * Unit tests for apiCompatChecker logic.
@@ -97,40 +98,35 @@ describe('apiCompatChecker data', () => {
   });
 
   describe('API version parsing', () => {
-    it('should parse compileSdkVersion from JSON5 content', () => {
-      const content = '{\n  "app": {\n    "products": [{ "compileSdkVersion": 14 }]\n  }\n}';
-      const match = content.match(/["']?compileSdkVersion["']?\s*[:=]\s*(\d+)/);
-      expect(match).toBeTruthy();
-      expect(parseInt(match![1], 10)).toBe(14);
+    it('should parse targetSdkVersion from modern build-profile content', () => {
+      const content = '{\n  "app": {\n    "products": [{ "targetSdkVersion": "6.0.0(20)" }]\n  }\n}';
+      const target = detectHarmonySdkFromBuildProfile(content);
+      expect(target?.field).toBe('targetSdkVersion');
+      expect(target?.apiLevel).toBe(20);
     });
 
-    it('should parse compileSdkVersion without quotes', () => {
+    it('should parse compileSdkVersion without quotes for legacy projects', () => {
       const content = 'compileSdkVersion: 13';
-      const match = content.match(/["']?compileSdkVersion["']?\s*[:=]\s*(\d+)/);
-      expect(match).toBeTruthy();
-      expect(parseInt(match![1], 10)).toBe(13);
+      const target = detectHarmonySdkFromBuildProfile(content);
+      expect(target?.field).toBe('compileSdkVersion');
+      expect(target?.apiLevel).toBe(13);
     });
 
     it('should parse compatibleSdkVersion as fallback', () => {
-      const content = '{ compatibleSdkVersion: 12 }';
-      const match = content.match(/["']?compatibleSdkVersion["']?\s*[:=]\s*(\d+)/);
-      expect(match).toBeTruthy();
-      expect(parseInt(match![1], 10)).toBe(12);
+      const content = '{ compatibleSdkVersion: "5.0.5(17)" }';
+      const target = detectHarmonySdkFromBuildProfile(content);
+      expect(target?.field).toBe('compatibleSdkVersion');
+      expect(target?.apiLevel).toBe(17);
     });
   });
 
-  describe('modelVersion recommendation', () => {
-    it('should recommend 5.0.2 for API 14', () => {
-      const versionMap: Record<number, string> = { 12: '5.0.0', 13: '5.0.1', 14: '5.0.2' };
-      expect(versionMap[14]).toBe('5.0.2');
-    });
-
-    it('should detect outdated modelVersion', () => {
+  describe('modelVersion validation', () => {
+    it('should accept semantic hvigor modelVersion strings', () => {
       const configContent = '"modelVersion": "5.0.0"';
-      const versionMatch = configContent.match(/["']?modelVersion["']?\s*[:=]\s*["'](\d+\.\d+\.\d+)["']/);
+      const versionMatch = configContent.match(/["']?modelVersion["']?\s*[:=]\s*["']([^"']+)["']/);
       expect(versionMatch).toBeTruthy();
       expect(versionMatch![1]).toBe('5.0.0');
-      expect(versionMatch![1] < '5.0.2').toBe(true);
+      expect(/^\d+\.\d+\.\d+$/.test(versionMatch![1])).toBe(true);
     });
   });
 });

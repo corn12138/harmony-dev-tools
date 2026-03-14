@@ -6,7 +6,7 @@
   "properties": {
     "modelVersion": {
       "type": "string",
-      "description": "Hvigor model version. Required for API 12+. / Hvigor 模型版本，API 12+ 必需。Use 5.0.0 for API 12, 5.0.1 for API 13, 5.0.2 for API 14.",
+      "description": "Hvigor model version. Required for API 12+. / Hvigor 模型版本，API 12+ 必需。官方 HarmonyOS 5.x/6.x 样例常见为 5.0.x，请以本机 hvigor 工具链为准。",
       "examples": ["5.0.0", "5.0.1", "5.0.2"]
     },
     "hvigorVersion": {

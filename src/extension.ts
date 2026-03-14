@@ -5,6 +5,7 @@ import { ModuleManager } from './core/module';
 import { Logger } from './utils/logger';
 import { createPublicAPI, HarmonyDevToolsAPI } from './core/api';
 import { COMMANDS, LANGUAGE_ID } from './utils/constants';
+import { getPreferredWorkspaceFolder } from './utils/workspace';
 
 // Module imports — only type references at top level, actual code loaded dynamically
 import { ProjectDetectorModule } from './project/projectDetector';
@@ -58,6 +59,26 @@ export async function deactivate(): Promise<void> {
 // ---- Layer 1: Auto-activated language features (on .ets file open) ----
 
 function registerLazyLanguageFeatures(context: vscode.ExtensionContext): void {
+  let resourceProvidersPromise:
+    | Promise<{
+        completion: import('./resource/resourceCompletion').ResourceCompletionProvider;
+        definition: import('./resource/resourceDefinition').ResourceDefinitionProvider;
+      }>
+    | undefined;
+
+  const getResourceProviders = async () => {
+    if (!resourceProvidersPromise) {
+      resourceProvidersPromise = Promise.all([
+        import('./resource/resourceCompletion'),
+        import('./resource/resourceDefinition'),
+      ]).then(([completionModule, definitionModule]) => ({
+        completion: new completionModule.ResourceCompletionProvider(),
+        definition: new definitionModule.ResourceDefinitionProvider(),
+      }));
+    }
+    return resourceProvidersPromise;
+  };
+
   // Completion provider — dynamically loads the completion module
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(LANGUAGE_ID, {
@@ -109,8 +130,8 @@ function registerLazyLanguageFeatures(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.languages.registerCompletionItemProvider(LANGUAGE_ID, {
       async provideCompletionItems(document, position) {
-        const { ResourceCompletionProvider } = await import('./resource/resourceCompletion');
-        return new ResourceCompletionProvider().provideCompletionItems(document, position);
+        const providers = await getResourceProviders();
+        return providers.completion.provideCompletionItems(document, position);
       },
     }, '\'', '"', '.')
   );
@@ -119,8 +140,8 @@ function registerLazyLanguageFeatures(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.languages.registerDefinitionProvider(LANGUAGE_ID, {
       async provideDefinition(document, position) {
-        const { ResourceDefinitionProvider } = await import('./resource/resourceDefinition');
-        return new ResourceDefinitionProvider().provideDefinition(document, position);
+        const providers = await getResourceProviders();
+        return providers.definition.provideDefinition(document, position);
       },
     })
   );
@@ -136,9 +157,27 @@ function registerLazyLanguageFeatures(context: vscode.ExtensionContext): void {
 // ---- Layer 1.5: TreeView panels & Task Provider ----
 
 function registerTreeViewsAndTasks(context: vscode.ExtensionContext): void {
+  // Project Files TreeView — uses getCurrentProjectFileIndex(), refreshes on project:indexUpdated
+  import('./project/projectFilesTreeView').then(({ ProjectFilesTreeProvider }) => {
+    const projectFilesProvider = new ProjectFilesTreeProvider(eventBus);
+    context.subscriptions.push(projectFilesProvider);
+    vscode.window.createTreeView('harmony.projectView', {
+      treeDataProvider: projectFilesProvider,
+    });
+  });
+
+  import('./resource/resourceTreeView').then(({ ResourceTreeProvider }) => {
+    const resourceProvider = new ResourceTreeProvider();
+    context.subscriptions.push(resourceProvider);
+    const treeView = vscode.window.createTreeView('harmony.resourceView', {
+      treeDataProvider: resourceProvider,
+    });
+    context.subscriptions.push(treeView);
+  });
+
   // Device TreeView — lazy import, register immediately so the panel exists
   import('./device/treeView').then(({ DeviceTreeProvider }) => {
-    const deviceProvider = new DeviceTreeProvider();
+    const deviceProvider = new DeviceTreeProvider(eventBus);
     context.subscriptions.push(deviceProvider);
     const treeView = vscode.window.createTreeView('harmony.deviceView', {
       treeDataProvider: deviceProvider,
@@ -318,7 +357,7 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
 
   lazyCommand(COMMANDS.DEBUG_APP, async () => {
     // Start a debug session using our HarmonyOS debug type
-    const folder = vscode.workspace.workspaceFolders?.[0];
+    const folder = getPreferredWorkspaceFolder();
     await vscode.debug.startDebugging(folder, {
       type: 'harmonyos',
       request: 'launch',
@@ -351,17 +390,21 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
     await stopEmulator();
   });
 
+  lazyCommand(COMMANDS.CHECK_ENVIRONMENT, async () => {
+    const { checkEnvironment } = await import('./project/checkEnvironment');
+    await checkEnvironment();
+  });
+
   lazyCommand(COMMANDS.TAKE_SCREENSHOT, async () => {
     const { captureScreenshot } = await import('./debug/uiInspector');
     const base64 = await captureScreenshot();
     if (base64) {
       const fs = await import('fs/promises');
       const path = await import('path');
-      const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '/tmp';
+      const folder = getPreferredWorkspaceFolder()?.uri.fsPath ?? '/tmp';
       const file = path.join(folder, `screenshot_${Date.now()}.png`);
       await fs.writeFile(file, Buffer.from(base64, 'base64'));
-      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
-      await vscode.window.showTextDocument(doc);
+      await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file));
       vscode.window.showInformationMessage(`Screenshot saved: ${file}`);
     } else {
       vscode.window.showWarningMessage('Failed to capture screenshot. Is a device connected?');

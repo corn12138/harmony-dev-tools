@@ -7,6 +7,7 @@ export const CONFIG_FILES = {
   OH_PACKAGE: 'oh-package.json5',
   MODULE_JSON: 'module.json5',
   APP_JSON: 'app.json5',
+  HVIGOR_CONFIG: 'hvigor-config.json5',
 } as const;
 
 export const COMMANDS = {
@@ -36,6 +37,7 @@ export const COMMANDS = {
   DEVICE_MIRROR: 'harmony.openDeviceMirror',
   LAUNCH_EMULATOR: 'harmony.launchEmulator',
   STOP_EMULATOR: 'harmony.stopEmulator',
+  CHECK_ENVIRONMENT: 'harmony.checkEnvironment',
 } as const;
 
 export const CONTEXT_KEYS = {
@@ -67,6 +69,9 @@ export const API_VERSIONS = {
   API_12: 12,
   API_13: 13,
   API_14: 14,
+  API_17: 17,
+  API_20: 20,
+  API_22: 22,
 } as const;
 
 export const DEPRECATED_APIS: Array<{

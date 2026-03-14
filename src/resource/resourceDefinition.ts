@@ -10,6 +10,8 @@ export class ResourceDefinitionProvider implements vscode.DefinitionProvider {
     document: vscode.TextDocument,
     position: vscode.Position
   ): Promise<vscode.Definition | undefined> {
+    await this.indexer.ensureInitialized();
+
     const range = document.getWordRangeAtPosition(position, /\$r\s*\(\s*['"][^'"]+['"]\s*\)/);
     if (!range) return undefined;
 
@@ -33,29 +35,31 @@ export class ResourceDiagnosticProvider implements vscode.Disposable {
   constructor() {
     this.diagnosticCollection = vscode.languages.createDiagnosticCollection('arkts-resources');
     this.disposables.push(this.diagnosticCollection);
+    void this.indexer.ensureInitialized().then(() => this.revalidateOpenDocuments());
 
     // Validate on file change
     const onSave = vscode.workspace.onDidSaveTextDocument((doc) => {
       if (doc.languageId === 'arkts') {
-        this.validate(doc);
+        void this.validate(doc);
       }
     });
     const onOpen = vscode.workspace.onDidOpenTextDocument((doc) => {
       if (doc.languageId === 'arkts') {
-        this.validate(doc);
+        void this.validate(doc);
       }
     });
     this.disposables.push(onSave, onOpen);
 
     // Re-validate when resource index updates
-    this.indexer.onDidUpdate(() => {
-      vscode.workspace.textDocuments
-        .filter((d) => d.languageId === 'arkts')
-        .forEach((d) => this.validate(d));
+    const onIndexUpdate = this.indexer.onDidUpdate(() => {
+      this.revalidateOpenDocuments();
     });
+    this.disposables.push(onIndexUpdate);
   }
 
-  validate(document: vscode.TextDocument): void {
+  async validate(document: vscode.TextDocument): Promise<void> {
+    await this.indexer.ensureInitialized();
+
     const diagnostics: vscode.Diagnostic[] = [];
     const text = document.getText();
 
@@ -80,6 +84,12 @@ export class ResourceDiagnosticProvider implements vscode.Disposable {
     }
 
     this.diagnosticCollection.set(document.uri, diagnostics);
+  }
+
+  private revalidateOpenDocuments(): void {
+    vscode.workspace.textDocuments
+      .filter((d) => d.languageId === 'arkts')
+      .forEach((d) => void this.validate(d));
   }
 
   dispose(): void {

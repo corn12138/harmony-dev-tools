@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.6.0] - 2026-03-14
+
+### Added
+- **HarmonyOS 5.x/6.x SDK alignment**:
+  - Added modern SDK parsing for `targetSdkVersion`, `compileSdkVersion`, `compatibleSdkVersion`
+  - Recognizes release strings like `6.0.0(20)` and `6.0.2(22)`
+  - Updated project templates, config hover docs, and schemas for the newer build-profile / oh-package conventions
+- **Environment check command** (`checkEnvironment.ts`):
+  - Detects HarmonyOS Command Line Tools such as `sdkmgr`, `ohpm`, and `codelinter`
+  - Surfaces official entry points for downloads, release notes, and the knowledge map
+- **Project and resource sidebars**:
+  - Added a resource tree view for strings, colors, media, and profiles
+  - Added project file indexing APIs and a project files tree view
+- **Shared command helpers**:
+  - Added reusable utilities for HarmonyOS SDK parsing, hvigor command generation, JSON5 field extraction, workspace selection, project metadata lookup, and HDC command execution/terminal rendering
+- **New unit tests** for Harmony SDK parsing, JSON5 helpers, hvigor helpers, HDC helpers, and project file indexing
+
+### Fixed
+- **Cold-start resource validation/definition bug**:
+  - `$r()` diagnostics and definition lookup now initialize the resource index before first use
+  - Resource completion no longer rebuilds the resource index on every trigger
+- **Cross-platform build/run inconsistencies**:
+  - Unified hvigor command construction across tasks, build/run, and terminal workflows
+  - Improved device-side HDC invocation with a shared helper instead of ad-hoc shell string concatenation
+- **JSON5 parsing regressions**:
+  - Build, run, debug, and project detection now read unquoted JSON5 keys like `bundleName`, `type`, and `mainElement`
+- **Manifest/API mismatches**:
+  - Implemented the previously declared `harmony.resourceView`
+  - Removed the unused `harmony.enableInlayHints` setting
+  - Public API `getDevices()` and `onDeviceChanged` now return meaningful data
+- **Multi-workspace targeting**:
+  - Core flows now prefer the active editor’s workspace instead of blindly using the first folder
+- **Packaging blocker**:
+  - Added `@vscode/vsce` as a dev dependency so `pnpm package` works in a clean environment
+
+### Changed
+- `buildAndRun.ts`, `terminalRunner.ts`, `debugProvider.ts`, `device/manager.ts`, `uiInspector.ts`, `emulatorManager.ts`, and `logViewer.ts` now rely on shared HDC helpers
+- `apiCompatChecker.ts` and `diagnosticProvider.ts` now use the newer HarmonyOS SDK detection path
+- `extension.ts` now registers cached resource providers and the new resource tree view
+
 ## [0.5.0] - 2026-03-12
 
 ### Added

@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { HarmonyModule, ModuleContext } from '../core/module';
 import { CONFIG_FILES, CONTEXT_KEYS } from '../utils/constants';
+import { extractJson5StringValue } from '../utils/json5';
+import { HarmonyProjectFileIndex, HarmonyProjectFileTracker } from './fileTracker';
 
 export interface ProjectInfo {
   rootPath: string;
@@ -11,16 +13,29 @@ export interface ProjectInfo {
   sdkVersion?: number;
 }
 
+let currentProjectInfo: ProjectInfo | undefined;
+let currentProjectFileIndex: HarmonyProjectFileIndex | undefined;
+
+export function getCurrentProjectInfo(): ProjectInfo | undefined {
+  return currentProjectInfo;
+}
+
+export function getCurrentProjectFileIndex(): HarmonyProjectFileIndex | undefined {
+  return currentProjectFileIndex;
+}
+
 export class ProjectDetectorModule implements HarmonyModule {
   readonly id = 'harmony.projectDetector';
   isActive = false;
   private statusBarItem?: vscode.StatusBarItem;
+  private fileTracker?: HarmonyProjectFileTracker;
   private disposables: vscode.Disposable[] = [];
 
   async activate(ctx: ModuleContext): Promise<void> {
     const projectInfo = await this.detectProject();
 
     if (projectInfo) {
+      currentProjectInfo = projectInfo;
       // Set context for when-clauses
       vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_HARMONY_PROJECT, true);
 
@@ -35,20 +50,21 @@ export class ProjectDetectorModule implements HarmonyModule {
         rootPath: projectInfo.rootPath,
         modules: projectInfo.modules,
       });
+      this.fileTracker = new HarmonyProjectFileTracker(vscode.Uri.file(projectInfo.rootPath), ctx.eventBus);
+      this.disposables.push(this.fileTracker);
+      const indexUpdatedSub = ctx.eventBus.on('project:indexUpdated', (data) => {
+        currentProjectFileIndex = data as HarmonyProjectFileIndex;
+      });
+      this.disposables.push(indexUpdatedSub);
+      const index = await this.fileTracker.rebuild();
+      currentProjectFileIndex = index;
       ctx.logger.info(`HarmonyOS project detected: ${projectInfo.rootPath}`);
+      ctx.logger.info(`Tracked HarmonyOS files: ${index.files.length}`);
     } else {
+      currentProjectInfo = undefined;
+      currentProjectFileIndex = undefined;
       vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_HARMONY_PROJECT, false);
     }
-
-    // Watch for config changes
-    const watcher = vscode.workspace.createFileSystemWatcher('**/{build-profile,oh-package,module,app}.json5');
-    watcher.onDidChange((uri) => {
-      ctx.eventBus.emit('project:configChanged', {
-        file: uri.fsPath,
-        type: path.basename(uri.fsPath),
-      });
-    });
-    this.disposables.push(watcher);
 
     this.isActive = true;
   }
@@ -56,6 +72,8 @@ export class ProjectDetectorModule implements HarmonyModule {
   async deactivate(): Promise<void> {
     this.disposables.forEach((d) => d.dispose());
     this.disposables = [];
+    currentProjectInfo = undefined;
+    currentProjectFileIndex = undefined;
     this.isActive = false;
   }
 
@@ -63,7 +81,14 @@ export class ProjectDetectorModule implements HarmonyModule {
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders?.length) return null;
 
-    for (const folder of workspaceFolders) {
+    const activeFolder = vscode.window.activeTextEditor?.document.uri
+      ? vscode.workspace.getWorkspaceFolder(vscode.window.activeTextEditor.document.uri)
+      : undefined;
+    const orderedFolders = activeFolder
+      ? [activeFolder, ...workspaceFolders.filter((folder) => folder.uri.toString() !== activeFolder.uri.toString())]
+      : workspaceFolders;
+
+    for (const folder of orderedFolders) {
       const buildProfileUri = vscode.Uri.joinPath(folder.uri, CONFIG_FILES.BUILD_PROFILE);
       try {
         await vscode.workspace.fs.stat(buildProfileUri);
@@ -107,9 +132,10 @@ export class ProjectDetectorModule implements HarmonyModule {
       const appJsonUri = vscode.Uri.joinPath(rootUri, 'AppScope', CONFIG_FILES.APP_JSON);
       const content = await vscode.workspace.fs.readFile(appJsonUri);
       const text = Buffer.from(content).toString('utf8');
-      // Simple JSON5 parse for bundleName (avoid heavy dependency)
-      const bundleMatch = text.match(/"bundleName"\s*:\s*"([^"]+)"/);
-      return { bundleName: bundleMatch?.[1] };
+      return {
+        appName: extractJson5StringValue(text, 'label'),
+        bundleName: extractJson5StringValue(text, 'bundleName'),
+      };
     } catch {
       return {};
     }

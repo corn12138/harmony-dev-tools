@@ -2,8 +2,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { resolveHdcPath, promptHdcConfiguration } from '../utils/config';
-import { CONFIG_FILES } from '../utils/constants';
+import { promptHdcConfiguration } from '../utils/config';
+import { buildHvigorCommand } from '../utils/hvigor';
+import { getPreferredWorkspaceFolder } from '../utils/workspace';
+import { findBuiltHapFiles, readBundleName, readEntryAbility } from '../utils/projectMetadata';
+import { buildHdcTargetArgs, execHdc, listHdcTargets } from '../utils/hdc';
 
 const execAsync = promisify(exec);
 
@@ -15,29 +18,26 @@ interface BuildAndRunOptions {
  * One-click workflow: Build HAP → Install to device → Launch app → (optionally) open UI Inspector
  */
 export async function buildAndRun(options: BuildAndRunOptions = {}): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = getPreferredWorkspaceFolder();
   if (!folder) {
     vscode.window.showErrorMessage('No workspace folder open.');
     return;
   }
 
-  const rootPath = folder.uri.fsPath;
-
   // Step 1: Check device
-  const hdc = await resolveHdcPath();
-  const device = await selectDevice(hdc);
+  const device = await selectDevice();
   if (!device) return;
 
   // Step 2: Build HAP
-  const hapPath = await buildHapWithProgress(rootPath);
+  const hapPath = await buildHapWithProgress(folder);
   if (!hapPath) return;
 
   // Step 3: Install HAP
-  const installed = await installHapToDevice(hdc, device, hapPath);
+  const installed = await installHapToDevice(device, hapPath);
   if (!installed) return;
 
   // Step 4: Launch app
-  const launched = await launchApp(hdc, device, rootPath);
+  const launched = await launchApp(device, folder.uri);
   if (!launched) return;
 
   // Step 5: Open UI Inspector (optional, default true)
@@ -50,12 +50,9 @@ export async function buildAndRun(options: BuildAndRunOptions = {}): Promise<voi
   vscode.window.showInformationMessage('App is running on device. UI Inspector opened.');
 }
 
-async function selectDevice(hdc: string): Promise<string | null> {
+async function selectDevice(): Promise<string | null> {
   try {
-    const { stdout } = await execAsync(`${hdc} list targets`, { timeout: 5000 });
-    const devices = stdout.trim().split('\n')
-      .filter((l) => l.trim().length > 0 && !l.includes('[Empty]'))
-      .map((l) => l.trim());
+    const devices = await listHdcTargets(5000);
 
     if (devices.length === 0) {
       vscode.window.showWarningMessage(
@@ -79,20 +76,22 @@ async function selectDevice(hdc: string): Promise<string | null> {
     const configured = await promptHdcConfiguration();
     if (configured) {
       // Retry with the newly configured path
-      return selectDevice(configured);
+      return selectDevice();
     }
     return null;
   }
 }
 
-async function buildHapWithProgress(rootPath: string): Promise<string | null> {
+async function buildHapWithProgress(folder: vscode.WorkspaceFolder): Promise<string | null> {
+  const rootPath = folder.uri.fsPath;
+
   return vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: 'HarmonyOS', cancellable: true },
     async (progress, token) => {
       progress.report({ message: 'Building HAP...' });
 
       try {
-        const buildPromise = execAsync('./hvigorw assembleHap --no-daemon', {
+        const buildPromise = execAsync(buildHvigorCommand({ task: 'assembleHap' }), {
           cwd: rootPath,
           timeout: 120_000,
         });
@@ -102,7 +101,7 @@ async function buildHapWithProgress(rootPath: string): Promise<string | null> {
           buildPromise.child?.kill();
         });
 
-        const { stdout, stderr } = await buildPromise;
+        const { stderr } = await buildPromise;
 
         if (token.isCancellationRequested) return null;
 
@@ -115,7 +114,7 @@ async function buildHapWithProgress(rootPath: string): Promise<string | null> {
         progress.report({ message: 'Locating HAP output...' });
 
         // Find the built HAP file
-        const hapPath = await findHapOutput(rootPath);
+        const hapPath = await findHapOutput(folder);
         if (!hapPath) {
           vscode.window.showErrorMessage(
             'Build completed but no .hap file found. Check build output.'
@@ -135,13 +134,9 @@ async function buildHapWithProgress(rootPath: string): Promise<string | null> {
   );
 }
 
-async function findHapOutput(rootPath: string): Promise<string | null> {
-  // HarmonyOS outputs HAP to: <module>/build/default/outputs/default/<module>-default-signed.hap
-  // or: <module>/build/outputs/default/<module>-default.hap
-  const hapFiles = await vscode.workspace.findFiles(
-    '**/build/**/outputs/**/*.hap',
-    '**/node_modules/**'
-  );
+async function findHapOutput(folder: vscode.WorkspaceFolder): Promise<string | null> {
+  const rootPath = folder.uri.fsPath;
+  const hapFiles = await findBuiltHapFiles(folder.uri);
 
   if (hapFiles.length === 0) return null;
 
@@ -169,13 +164,13 @@ async function findHapOutput(rootPath: string): Promise<string | null> {
   return picked?.fsPath ?? null;
 }
 
-async function installHapToDevice(hdc: string, device: string, hapPath: string): Promise<boolean> {
+async function installHapToDevice(device: string, hapPath: string): Promise<boolean> {
   return vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: 'HarmonyOS' },
     async (progress) => {
       progress.report({ message: `Installing to ${device}...` });
       try {
-        await execAsync(`${hdc} -t ${device} install "${hapPath}"`, { timeout: 30_000 });
+        await execHdc([...buildHdcTargetArgs(device), 'install', hapPath], { timeout: 30_000 });
         return true;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -186,9 +181,8 @@ async function installHapToDevice(hdc: string, device: string, hapPath: string):
   ) ?? false;
 }
 
-async function launchApp(hdc: string, device: string, rootPath: string): Promise<boolean> {
-  // Read bundleName from AppScope/app.json5
-  const bundleName = await readBundleName(rootPath);
+async function launchApp(device: string, rootUri: vscode.Uri): Promise<boolean> {
+  const bundleName = await readBundleName(rootUri);
   if (!bundleName) {
     vscode.window.showErrorMessage(
       'Cannot find bundleName in AppScope/app.json5. Is this a HarmonyOS project?'
@@ -196,14 +190,13 @@ async function launchApp(hdc: string, device: string, rootPath: string): Promise
     return false;
   }
 
-  // Read the entry ability name from module.json5
-  const abilityName = await readEntryAbility(rootPath);
+  const abilityName = await readEntryAbility(rootUri);
   const fullAbility = abilityName || 'EntryAbility';
 
   try {
     // aa start -a <abilityName> -b <bundleName>
-    await execAsync(
-      `${hdc} -t ${device} shell "aa start -a ${fullAbility} -b ${bundleName}"`,
+    await execHdc(
+      [...buildHdcTargetArgs(device), 'shell', `aa start -a ${fullAbility} -b ${bundleName}`],
       { timeout: 10_000 }
     );
     return true;
@@ -211,44 +204,5 @@ async function launchApp(hdc: string, device: string, rootPath: string): Promise
     const msg = err instanceof Error ? err.message : String(err);
     vscode.window.showErrorMessage(`Launch failed: ${msg.slice(0, 300)}`);
     return false;
-  }
-}
-
-async function readBundleName(rootPath: string): Promise<string | null> {
-  try {
-    const uri = vscode.Uri.joinPath(
-      vscode.Uri.file(rootPath), 'AppScope', CONFIG_FILES.APP_JSON
-    );
-    const content = await vscode.workspace.fs.readFile(uri);
-    const text = Buffer.from(content).toString('utf8');
-    const match = text.match(/"bundleName"\s*:\s*"([^"]+)"/);
-    return match?.[1] ?? null;
-  } catch {
-    return null;
-  }
-}
-
-async function readEntryAbility(rootPath: string): Promise<string | null> {
-  try {
-    // Find entry module's module.json5
-    const moduleFiles = await vscode.workspace.findFiles(
-      '**/src/main/module.json5',
-      '**/node_modules/**'
-    );
-
-    for (const file of moduleFiles) {
-      const content = await vscode.workspace.fs.readFile(file);
-      const text = Buffer.from(content).toString('utf8');
-
-      // Check if this is the entry module (type: "entry")
-      if (text.includes('"entry"') || text.includes("'entry'")) {
-        // Extract first ability name
-        const abilityMatch = text.match(/"name"\s*:\s*"(\w*Ability\w*)"/);
-        if (abilityMatch) return abilityMatch[1];
-      }
-    }
-    return null;
-  } catch {
-    return null;
   }
 }

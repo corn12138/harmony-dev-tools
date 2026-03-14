@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "HarmonyOS Build Profile",
-  "description": "HarmonyOS 构建配置文件 / Build configuration file (supports API 12-14)",
+  "description": "HarmonyOS 构建配置文件 / Build configuration file (supports legacy compileSdkVersion and modern targetSdkVersion projects)",
   "type": "object",
   "properties": {
     "app": {
@@ -39,8 +39,9 @@
             "properties": {
               "name": { "type": "string", "description": "产品名称 (default/free/paid)" },
               "signingConfig": { "type": "string" },
-              "compatibleSdkVersion": { "type": ["string", "number"], "description": "最低兼容 SDK 版本 (e.g., 12)" },
-              "compileSdkVersion": { "type": ["string", "number"], "description": "编译 SDK 版本 (e.g., 14)" },
+              "compatibleSdkVersion": { "type": ["string", "number"], "description": "最低兼容 SDK 版本 (e.g., 14 or '5.0.5(17)')" },
+              "targetSdkVersion": { "type": ["string", "number"], "description": "目标 SDK 版本 (e.g., '6.0.0(20)' or '6.0.2(22)')" },
+              "compileSdkVersion": { "type": ["string", "number"], "description": "旧版编译 SDK 版本 (legacy, e.g., 14)" },
               "runtimeOS": { "type": "string", "enum": ["HarmonyOS", "OpenHarmony"] },
               "bundleName": { "type": "string", "description": "应用包名 / Bundle name (API 13+)" },
               "buildOption": {
@@ -56,6 +57,18 @@
                   }
                 }
               }
+            },
+            "required": ["name"]
+          }
+        }
+        ,
+        "buildModeSet": {
+          "type": "array",
+          "description": "构建模式集合 / Build mode set",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "description": "构建模式名称 (e.g., debug/release)" }
             },
             "required": ["name"]
           }

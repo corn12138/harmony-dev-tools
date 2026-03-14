@@ -1,9 +1,33 @@
 import * as vscode from 'vscode';
 import { getDecorators, getComponents, apiLabel, type DecoratorMeta, type ComponentMeta } from '../utils/metadata';
+import { LATEST_HARMONY_RELEASE } from '../utils/harmonySdk';
 
 interface DocItem extends vscode.QuickPickItem {
   docUrl: string;
 }
+
+const OFFICIAL_SHORTCUTS: DocItem[] = [
+  {
+    label: 'HarmonyOS 版本说明 / Release Notes',
+    detail: `查看公开版本历史，当前已知最新公开版本为 ${LATEST_HARMONY_RELEASE.sdkVersion}`,
+    docUrl: 'https://developer.huawei.com/consumer/en/doc/harmonyos-releases/overview-allversion',
+  },
+  {
+    label: 'HarmonyOS 知识地图 / Knowledge Map',
+    detail: '从官方知识地图按场景查看 ArkUI、工程、调试和分发资料',
+    docUrl: 'https://developer.huawei.com/consumer/cn/app/knowledge-map/',
+  },
+  {
+    label: 'HarmonyOS Command Line Tools',
+    detail: '查看 sdkmgr / ohpm / codelinter 的获取与使用说明',
+    docUrl: 'https://developer.huawei.com/consumer/en/doc/harmonyos-guides/ide-commandline-get',
+  },
+  {
+    label: 'HarmonyOS 下载中心 / Downloads',
+    detail: '下载最新 SDK、Command Line Tools、DevEco Studio 等工具',
+    docUrl: 'https://developer.huawei.com/consumer/en/download/',
+  },
+];
 
 export async function openDocs(prefill?: string): Promise<void> {
   const items = buildDocItems();
@@ -31,6 +55,9 @@ function buildDocItems(): DocItem[] {
 
   const decorators = getDecorators();
   const components = getComponents();
+
+  items.push({ label: '官方入口 / Official Shortcuts', kind: vscode.QuickPickItemKind.Separator, docUrl: '' });
+  items.push(...OFFICIAL_SHORTCUTS);
 
   const decsByModel = new Map<string, DecoratorMeta[]>();
   for (const d of decorators) {

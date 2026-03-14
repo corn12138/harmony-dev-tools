@@ -1,5 +1,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import {
+  DEFAULT_OH_PACKAGE_MODEL_VERSION,
+  DEFAULT_TEMPLATE_COMPATIBLE_SDK,
+  DEFAULT_TEMPLATE_TARGET_SDK,
+} from '../utils/harmonySdk';
 
 export type TemplateId = 'empty' | 'list' | 'tabs' | 'login';
 
@@ -40,9 +45,23 @@ function getCommonFiles(opts: ProjectOptions): FileEntry[] {
       {
         "name": "default",
         "signingConfig": "default",
-        "compatibleSdkVersion": "5.0.0(12)",
-        "compileSdkVersion": "5.0.0(12)",
-        "runtimeOS": "HarmonyOS"
+        "compatibleSdkVersion": "${DEFAULT_TEMPLATE_COMPATIBLE_SDK}",
+        "targetSdkVersion": "${DEFAULT_TEMPLATE_TARGET_SDK}",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
       }
     ]
   },
@@ -58,6 +77,7 @@ function getCommonFiles(opts: ProjectOptions): FileEntry[] {
     {
       relativePath: 'oh-package.json5',
       content: `{
+  "modelVersion": "${DEFAULT_OH_PACKAGE_MODEL_VERSION}",
   "name": "${opts.projectName.toLowerCase()}",
   "version": "1.0.0",
   "description": "",
@@ -92,6 +112,7 @@ function getCommonFiles(opts: ProjectOptions): FileEntry[] {
     {
       relativePath: 'entry/oh-package.json5',
       content: `{
+  "modelVersion": "${DEFAULT_OH_PACKAGE_MODEL_VERSION}",
   "name": "entry",
   "version": "1.0.0",
   "description": "",

@@ -10,13 +10,15 @@ import * as vscode from 'vscode';
 
 const CONFIG_KEY_DOCS: Record<string, Record<string, string>> = {
   'build-profile': {
-    compileSdkVersion: '编译 SDK 版本号（如 12、13、14）。决定了可使用的 API 集合。\n\nCompile SDK version number. Determines the available API set.',
-    compatibleSdkVersion: '最低兼容 SDK 版本。低于此版本的设备无法安装 HAP。\n\nMinimum compatible SDK version.',
+    targetSdkVersion: '目标 SDK 版本。新版 HarmonyOS 5.x/6.x 工程通常使用字符串版本号，例如 `6.0.0(20)` 或 `6.0.2(22)`。\n\nTarget SDK version. Modern HarmonyOS projects usually use release strings such as `6.0.0(20)` or `6.0.2(22)`.',
+    compileSdkVersion: '旧版编译 SDK 版本号（如 12、13、14）。为兼容历史工程保留，新工程更常见的是 `targetSdkVersion`。\n\nLegacy compile SDK version number. Retained for older projects; newer projects more commonly use `targetSdkVersion`.',
+    compatibleSdkVersion: '最低兼容 SDK 版本。可以是数字（如 14）或新版字符串（如 `5.0.5(17)`）。\n\nMinimum compatible SDK version. Can be a plain number or a release string such as `5.0.5(17)`.',
     products: '产品维度配置数组。每个 product 定义一个构建变体（如 default）。\n\nProduct flavor configurations array.',
     modules: '模块列表，每个模块引用 entry/feature/har 目录。\n\nModule list referencing entry/feature/har directories.',
     signingConfigs: '签名配置，包含 keystore 路径、密码等。发布前必须配置。\n\nSigning configurations for release builds.',
     buildOption: '构建选项：sourceOption、externalNativeOptions 等。\n\nBuild options: source options, native build settings.',
     buildOptionSet: '构建选项集合。可定义多套编译选项供不同 product 选用。\n\nBuild option sets for different product variants.',
+    buildModeSet: '构建模式集合。新版样例工程常见 `debug` / `release` 两个模式。\n\nBuild mode set. Modern sample projects usually declare `debug` and `release` modes here.',
     targets: '编译目标配置（target name → 可选的 source/runtimeOS）。\n\nCompilation target configurations.',
   },
   module: {
@@ -48,6 +50,7 @@ const CONFIG_KEY_DOCS: Record<string, Record<string, string>> = {
     apiReleaseType: 'API 发布类型：Release | Beta | Canary。\n\nAPI release type.',
   },
   'oh-package': {
+    modelVersion: 'OHPM 模型版本。官方 HarmonyOS 5.x/6.x 样例常见为 `5.0.5`。\n\nOHPM model version. Official HarmonyOS 5.x/6.x samples commonly use `5.0.5`.',
     name: '包名称。\n\nPackage name.',
     version: '语义化版本号（如 "1.0.0"）。\n\nSemantic version.',
     description: '包描述。\n\nPackage description.',

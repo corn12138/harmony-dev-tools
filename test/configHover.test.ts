@@ -6,7 +6,7 @@ describe('configHoverProvider', () => {
     it('should return build-profile docs for build-profile.json5', () => {
       const docs = getDocSetForFile('/project/build-profile.json5');
       expect(docs).toBeDefined();
-      expect(docs!['compileSdkVersion']).toBeDefined();
+      expect(docs!['targetSdkVersion']).toBeDefined();
     });
 
     it('should return module docs for module.json5', () => {
@@ -43,7 +43,7 @@ describe('configHoverProvider', () => {
 
     it('build-profile should have essential keys', () => {
       const bp = CONFIG_KEY_DOCS['build-profile'];
-      const essentialKeys = ['compileSdkVersion', 'compatibleSdkVersion', 'products', 'modules', 'signingConfigs'];
+      const essentialKeys = ['targetSdkVersion', 'compileSdkVersion', 'compatibleSdkVersion', 'buildModeSet', 'products', 'modules', 'signingConfigs'];
       for (const key of essentialKeys) {
         expect(bp[key]).toBeDefined();
         expect(bp[key].length).toBeGreaterThan(10);
@@ -68,7 +68,7 @@ describe('configHoverProvider', () => {
 
     it('oh-package should have essential keys', () => {
       const pkg = CONFIG_KEY_DOCS['oh-package'];
-      const essentialKeys = ['name', 'version', 'dependencies', 'devDependencies'];
+      const essentialKeys = ['modelVersion', 'name', 'version', 'dependencies', 'devDependencies'];
       for (const key of essentialKeys) {
         expect(pkg[key]).toBeDefined();
       }

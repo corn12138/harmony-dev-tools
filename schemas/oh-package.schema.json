@@ -4,6 +4,7 @@
   "description": "HarmonyOS 包管理配置 / Package management configuration",
   "type": "object",
   "properties": {
+    "modelVersion": { "type": "string", "description": "OHPM 模型版本 / OHPM model version (e.g., 5.0.5)" },
     "name": { "type": "string", "description": "包名 / Package name" },
     "version": { "type": "string", "description": "版本号 / Version (semver)" },
     "description": { "type": "string", "description": "包描述 / Package description" },

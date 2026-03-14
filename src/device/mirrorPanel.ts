@@ -6,11 +6,7 @@ import {
   sendKeyEvent,
   sendLongPress,
 } from '../debug/uiInspector';
-import { resolveHdcPath } from '../utils/config';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-
-const execAsync = promisify(exec);
+import { listHdcTargets } from '../utils/hdc';
 
 let panel: vscode.WebviewPanel | undefined;
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
@@ -96,12 +92,7 @@ export async function openDeviceMirror(deviceId?: string): Promise<void> {
 
 async function autoSelectDevice(): Promise<string | undefined> {
   try {
-    const hdc = await resolveHdcPath();
-    const { stdout } = await execAsync(`${hdc} list targets`, { timeout: 3000 });
-    const devices = stdout.trim().split('\n')
-      .filter(l => l.trim() && !l.includes('[Empty]'))
-      .map(l => l.trim());
-    return devices[0];
+    return (await listHdcTargets(3000))[0];
   } catch {
     return undefined;
   }

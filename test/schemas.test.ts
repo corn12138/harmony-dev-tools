@@ -39,10 +39,15 @@ describe('JSON Schemas', () => {
     });
   }
 
-  describe('build-profile.schema.json API 14 fields', () => {
+  describe('build-profile.schema.json modern fields', () => {
     const schema = JSON.parse(readFileSync(join(schemasDir, 'build-profile.schema.json'), 'utf8'));
 
-    it('should support compileSdkVersion up to 14', () => {
+    it('should support targetSdkVersion for modern projects', () => {
+      const products = schema.properties.app.properties.products;
+      expect(products.items.properties.targetSdkVersion).toBeDefined();
+    });
+
+    it('should retain compileSdkVersion for legacy projects', () => {
       const products = schema.properties.app.properties.products;
       expect(products.items.properties.compileSdkVersion).toBeDefined();
     });
@@ -51,6 +56,12 @@ describe('JSON Schemas', () => {
       const buildOption = schema.properties.app.properties.products.items.properties.buildOption;
       expect(buildOption).toBeDefined();
       expect(buildOption.properties.strictMode).toBeDefined();
+    });
+
+    it('should support buildModeSet', () => {
+      const buildModeSet = schema.properties.app.properties.buildModeSet;
+      expect(buildModeSet).toBeDefined();
+      expect(buildModeSet.items.properties.name).toBeDefined();
     });
 
     it('should support srcPath as array (API 14+)', () => {
@@ -76,7 +87,7 @@ describe('JSON Schemas', () => {
   describe('hvigor-config.schema.json', () => {
     const schema = JSON.parse(readFileSync(join(schemasDir, 'hvigor-config.schema.json'), 'utf8'));
 
-    it('should have modelVersion with examples for API 12-14', () => {
+    it('should have modelVersion examples for 5.x toolchains', () => {
       expect(schema.properties.modelVersion.examples).toContain('5.0.0');
       expect(schema.properties.modelVersion.examples).toContain('5.0.2');
     });
@@ -84,6 +95,10 @@ describe('JSON Schemas', () => {
 
   describe('oh-package.schema.json new fields', () => {
     const schema = JSON.parse(readFileSync(join(schemasDir, 'oh-package.schema.json'), 'utf8'));
+
+    it('should support modelVersion', () => {
+      expect(schema.properties.modelVersion).toBeDefined();
+    });
 
     it('should support overrides (API 13+)', () => {
       expect(schema.properties.overrides).toBeDefined();

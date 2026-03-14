@@ -1,7 +1,9 @@
 import * as vscode from 'vscode';
 import { HarmonyRegistry, Contributor } from './registry';
 import { HarmonyEventBus } from './eventBus';
-import { ProjectInfo } from '../project/projectDetector';
+import { ProjectInfo, getCurrentProjectInfo, getCurrentProjectFileIndex } from '../project/projectDetector';
+import type { HarmonyProjectFileIndex } from '../project/fileTracker';
+import { listConnectedDevices } from '../device/devices';
 
 // ---- Extension Point Interfaces ----
 
@@ -42,6 +44,14 @@ export interface DeviceInfo {
   name: string;
   type: string;
   status: 'online' | 'offline';
+}
+
+export interface DeviceChangeEvent {
+  id: string;
+  name?: string;
+  type?: string;
+  status?: DeviceInfo['status'];
+  change: 'connected' | 'disconnected';
 }
 
 export interface BuildTaskContributor extends Contributor {
@@ -87,13 +97,15 @@ export interface HarmonyDevToolsAPI {
 
   // Queries
   getProjectInfo(): ProjectInfo | undefined;
+  getProjectFileIndex(): HarmonyProjectFileIndex | undefined;
   getDevices(): Promise<DeviceInfo[]>;
 
   // Events
   onBuildStarted: vscode.Event<{ task: string; module?: string }>;
   onBuildCompleted: vscode.Event<{ task: string; success: boolean; duration: number }>;
-  onDeviceChanged: vscode.Event<{ id: string; name: string; type: string }>;
+  onDeviceChanged: vscode.Event<DeviceChangeEvent>;
   onProjectDetected: vscode.Event<{ rootPath: string; modules: string[] }>;
+  onProjectIndexUpdated: vscode.Event<HarmonyProjectFileIndex>;
 }
 
 export function createPublicAPI(
@@ -101,6 +113,23 @@ export function createPublicAPI(
   eventBus: HarmonyEventBus
 ): HarmonyDevToolsAPI {
   const { ExtensionPoints } = require('./registry');
+  const deviceChangedEmitter = new vscode.EventEmitter<DeviceChangeEvent>();
+
+  eventBus.on('device:connected', (device) => {
+    deviceChangedEmitter.fire({
+      ...device,
+      status: 'online',
+      change: 'connected',
+    });
+  });
+
+  eventBus.on('device:disconnected', (device) => {
+    deviceChangedEmitter.fire({
+      id: device.id,
+      status: 'offline',
+      change: 'disconnected',
+    });
+  });
 
   return {
     apiVersion: 1,
@@ -114,12 +143,14 @@ export function createPublicAPI(
     registerPreviewRenderer: (r) => registry.register(ExtensionPoints.PREVIEW, r),
     registerCodeAction: (a) => registry.register(ExtensionPoints.CODE_ACTION, a),
 
-    getProjectInfo: () => undefined, // Will be wired up after project detection
-    getDevices: async () => [],
+    getProjectInfo: () => getCurrentProjectInfo(),
+    getProjectFileIndex: () => getCurrentProjectFileIndex(),
+    getDevices: async () => listConnectedDevices(),
 
     onBuildStarted: eventBus.on.bind(eventBus, 'build:started') as any,
     onBuildCompleted: eventBus.on.bind(eventBus, 'build:completed') as any,
-    onDeviceChanged: eventBus.on.bind(eventBus, 'device:connected') as any,
+    onDeviceChanged: deviceChangedEmitter.event,
     onProjectDetected: eventBus.on.bind(eventBus, 'project:detected') as any,
+    onProjectIndexUpdated: eventBus.on.bind(eventBus, 'project:indexUpdated') as any,
   };
 }

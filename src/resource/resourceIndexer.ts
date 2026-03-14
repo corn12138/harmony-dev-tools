@@ -18,6 +18,8 @@ export class ResourceIndexer implements vscode.Disposable {
   private resources = new Map<string, ResourceEntry>();
   private disposables: vscode.Disposable[] = [];
   private _onDidUpdate = new vscode.EventEmitter<void>();
+  private initialized = false;
+  private initializing?: Promise<void>;
   readonly onDidUpdate = this._onDidUpdate.event;
 
   constructor() {
@@ -36,9 +38,13 @@ export class ResourceIndexer implements vscode.Disposable {
   }
 
   async rebuild(): Promise<void> {
+    this.initializing = undefined;
     this.resources.clear();
     const folders = vscode.workspace.workspaceFolders;
-    if (!folders) return;
+    if (!folders) {
+      this.initialized = true;
+      return;
+    }
 
     for (const folder of folders) {
       // Scan element JSON files (string.json, color.json, float.json, etc.)
@@ -73,7 +79,20 @@ export class ResourceIndexer implements vscode.Disposable {
       }
     }
 
+    this.initialized = true;
     this._onDidUpdate.fire();
+  }
+
+  async ensureInitialized(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    if (!this.initializing) {
+      this.initializing = this.rebuild();
+    }
+
+    await this.initializing;
   }
 
   private async indexElementFile(uri: vscode.Uri): Promise<void> {
@@ -124,6 +143,8 @@ export class ResourceIndexer implements vscode.Disposable {
   dispose(): void {
     this.disposables.forEach((d) => d.dispose());
     this.resources.clear();
+    this.initialized = false;
+    this.initializing = undefined;
   }
 }
 

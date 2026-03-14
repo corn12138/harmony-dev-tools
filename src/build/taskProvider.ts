@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
+import { buildHvigorCommand } from '../utils/hvigor';
 
 interface HvigorTaskDefinition extends vscode.TaskDefinition {
   task: string;
@@ -38,7 +38,7 @@ export class HvigorTaskProvider implements vscode.TaskProvider {
           folder,
           taskDef.label,
           'hvigor',
-          new vscode.ShellExecution(`hvigorw ${taskDef.name} --no-daemon`, { cwd: folder.uri.fsPath }),
+          new vscode.ShellExecution(buildHvigorCommand({ task: taskDef.name }), { cwd: folder.uri.fsPath }),
           '$hvigor'
         );
         task.group = taskDef.group;
@@ -54,13 +54,15 @@ export class HvigorTaskProvider implements vscode.TaskProvider {
     if (!definition.task) return undefined;
 
     const folder = task.scope as vscode.WorkspaceFolder;
-    const modulePart = definition.module ? `:${definition.module}:` : '';
     return new vscode.Task(
       definition,
       folder ?? vscode.TaskScope.Workspace,
       definition.task,
       'hvigor',
-      new vscode.ShellExecution(`hvigorw ${modulePart}${definition.task} --no-daemon`),
+      new vscode.ShellExecution(
+        buildHvigorCommand({ task: definition.task, module: definition.module }),
+        folder ? { cwd: folder.uri.fsPath } : undefined,
+      ),
       '$hvigor'
     );
   }

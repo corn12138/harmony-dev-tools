@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { KNOWN_PACKAGES, analyzeDependencies } from './ohpmInsight';
+import { getPreferredWorkspaceFolder } from '../utils/workspace';
 
 interface DepAction extends vscode.QuickPickItem {
   action: 'update' | 'add' | 'install' | 'audit';
@@ -8,13 +9,17 @@ interface DepAction extends vscode.QuickPickItem {
 }
 
 export async function manageDeps(): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = getPreferredWorkspaceFolder();
   if (!folder) {
     vscode.window.showWarningMessage('No workspace folder open.');
     return;
   }
 
-  const ohPkgFiles = await vscode.workspace.findFiles('**/oh-package.json5', '**/node_modules/**', 5);
+  const ohPkgFiles = await vscode.workspace.findFiles(
+    new vscode.RelativePattern(folder, '**/oh-package.json5'),
+    '**/node_modules/**',
+    5,
+  );
   if (ohPkgFiles.length === 0) {
     vscode.window.showWarningMessage('No oh-package.json5 found in the workspace.');
     return;

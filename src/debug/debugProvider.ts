@@ -1,10 +1,8 @@
 import * as vscode from 'vscode';
-import { exec, spawn } from 'child_process';
-import { promisify } from 'util';
-import { resolveHdcPath } from '../utils/config';
-import { CONFIG_FILES } from '../utils/constants';
-
-const execAsync = promisify(exec);
+import { spawn } from 'child_process';
+import { readBundleName, readEntryAbility } from '../utils/projectMetadata';
+import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
+import { getPreferredWorkspaceFolder } from '../utils/workspace';
 
 /**
  * HarmonyOS Debug Configuration Provider
@@ -107,10 +105,9 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
   }
 
   private async handleLaunch(reqSeq: number): Promise<void> {
-    const hdc = await resolveHdcPath();
     const port = this.config.debugPort || 9230;
     const deviceId = this.config.deviceId || '';
-    const target = deviceId ? `-t ${deviceId}` : '';
+    const targetArgs = buildHdcTargetArgs(deviceId);
 
     try {
       // Step 1: Read project info if not provided
@@ -118,10 +115,10 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
       let abilityName = this.config.abilityName || 'EntryAbility';
 
       if (!bundleName) {
-        const folder = vscode.workspace.workspaceFolders?.[0];
+        const folder = getPreferredWorkspaceFolder();
         if (folder) {
-          bundleName = await this.readBundleName(folder.uri.fsPath);
-          const detected = await this.readEntryAbility(folder.uri.fsPath);
+          bundleName = await readBundleName(folder.uri);
+          const detected = await readEntryAbility(folder.uri);
           if (detected) abilityName = detected;
         }
       }
@@ -136,17 +133,17 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
       // Step 2: Set up HDC port forwarding
       this.sendEvent('output', { category: 'console', output: `Forwarding debug port ${port}...\n` });
       try {
-        await execAsync(`${hdc} ${target} fport tcp:${port} tcp:${port}`, { timeout: 5000 });
+        await execHdc([...targetArgs, 'fport', `tcp:${port}`, `tcp:${port}`], { timeout: 5000 });
       } catch {
         // fport may already exist, try removing and re-adding
-        await execAsync(`${hdc} ${target} fport rm tcp:${port} tcp:${port}`).catch(() => {});
-        await execAsync(`${hdc} ${target} fport tcp:${port} tcp:${port}`, { timeout: 5000 });
+        await execHdc([...targetArgs, 'fport', 'rm', `tcp:${port}`, `tcp:${port}`]).catch(() => {});
+        await execHdc([...targetArgs, 'fport', `tcp:${port}`, `tcp:${port}`], { timeout: 5000 });
       }
 
       // Step 3: Launch app in debug mode
       this.sendEvent('output', { category: 'console', output: 'Launching app in debug mode...\n' });
-      await execAsync(
-        `${hdc} ${target} shell "aa start -a ${abilityName} -b ${bundleName} -D"`,
+      await execHdc(
+        [...targetArgs, 'shell', `aa start -a ${abilityName} -b ${bundleName} -D`],
         { timeout: 10_000 }
       );
 
@@ -160,14 +157,14 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
         name: 'HarmonyOS CDP',
         port,
         address: 'localhost',
-        webRoot: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '',
+        webRoot: getPreferredWorkspaceFolder()?.uri.fsPath || '',
         sourceMaps: true,
         skipFiles: ['<node_internals>/**'],
       };
 
       // Launch the CDP attach session
       const started = await vscode.debug.startDebugging(
-        vscode.workspace.workspaceFolders?.[0],
+        getPreferredWorkspaceFolder(),
         debugConfig
       );
 
@@ -186,13 +183,12 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
 
   private async handleDisconnect(reqSeq: number): Promise<void> {
     // Clean up port forwarding
-    const hdc = await resolveHdcPath();
     const port = this.config.debugPort || 9230;
     const deviceId = this.config.deviceId || '';
-    const target = deviceId ? `-t ${deviceId}` : '';
+    const targetArgs = buildHdcTargetArgs(deviceId);
 
     try {
-      await execAsync(`${hdc} ${target} fport rm tcp:${port} tcp:${port}`).catch(() => {});
+      await execHdc([...targetArgs, 'fport', 'rm', `tcp:${port}`, `tcp:${port}`]).catch(() => {});
     } catch { /* best effort cleanup */ }
 
     if (this.portForwardProcess) {
@@ -233,31 +229,6 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
       event,
       body: body || {},
     } as unknown as vscode.DebugProtocolMessage);
-  }
-
-  private async readBundleName(rootPath: string): Promise<string | null> {
-    try {
-      const uri = vscode.Uri.joinPath(vscode.Uri.file(rootPath), 'AppScope', CONFIG_FILES.APP_JSON);
-      const content = await vscode.workspace.fs.readFile(uri);
-      const text = Buffer.from(content).toString('utf8');
-      const match = text.match(/"bundleName"\s*:\s*"([^"]+)"/);
-      return match?.[1] ?? null;
-    } catch { return null; }
-  }
-
-  private async readEntryAbility(rootPath: string): Promise<string | null> {
-    try {
-      const files = await vscode.workspace.findFiles('**/src/main/module.json5', '**/node_modules/**');
-      for (const file of files) {
-        const content = await vscode.workspace.fs.readFile(file);
-        const text = Buffer.from(content).toString('utf8');
-        if (text.includes('"entry"')) {
-          const m = text.match(/"name"\s*:\s*"(\w*Ability\w*)"/);
-          if (m) return m[1];
-        }
-      }
-      return null;
-    } catch { return null; }
   }
 
   dispose(): void {

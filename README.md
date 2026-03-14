@@ -23,8 +23,8 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
 
 ### HarmonyOS NEXT / V2 State Management / V2 状态管理
 
-> **v0.2.0+** — Full support for HarmonyOS NEXT (API 12+) V2 decorators.
-> **v0.2.4 NEW** — API 13 (HarmonyOS 5.0.1) and API 14 (HarmonyOS 5.0.2) support.
+> ArkUI language features currently cover API 12-14 decorators/components.
+> 工程配置识别已补齐新版 HarmonyOS 5.x / 6.x `targetSdkVersion`、`buildModeSet`、`oh-package modelVersion` 写法。
 
 - **V2 Decorator support / V2 装饰器支持** — `@ComponentV2`, `@Local`, `@Param`, `@Once`, `@Event`, `@Monitor`, `@Computed`, `@ObservedV2`, `@Trace`, `@Provider`, `@Consumer`
 - **API 13+ Decorators / API 13+ 装饰器** — `@Require` (required parameter enforcement)
@@ -34,11 +34,12 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
   - `@Component` → `@ComponentV2`, `@State` → `@Local`, `@Prop` → `@Param`, `@Provide` → `@Provider`, `@Consume` → `@Consumer`, `@Watch` → `@Monitor`, `@Observed` → `@ObservedV2`
   - Detects V1/V2 mixing and warns before proceeding / 检测 V1/V2 混用并在执行前警告
 - **API Compatibility Check / API 兼容性检查** — run `HarmonyOS: Check API Compatibility` to scan your project for version mismatches / 运行命令扫描项目中的版本兼容问题
-  - Validates feature usage against `compileSdkVersion` for API 12/13/14 / 检查各 API 级别特性使用是否匹配编译 SDK 版本
+  - Recognizes modern `targetSdkVersion` (e.g. `6.0.0(20)` / `6.0.2(22)`) and legacy `compileSdkVersion` / 同时识别新版 `targetSdkVersion` 和旧版 `compileSdkVersion`
+  - Validates feature usage against currently covered API 12/13/14 metadata / 基于当前已覆盖的 API 12/13/14 特性库做兼容性检查
   - **Deprecated API detection / 废弃 API 检测** — detects 15+ deprecated modules and functions with migration suggestions / 检测 15+ 废弃模块和函数并给出迁移建议
   - Line-number reporting for each issue / 每个问题报告行号
   - Upgrade suggestions / 升级建议
-  - Checks `hvigor-config.json5` `modelVersion` / 检查 hvigor 配置版本
+  - Checks `hvigor-config.json5` `modelVersion` format / 检查 hvigor 配置版本格式
   - Reports V1/V2 mixing in same file / 报告同文件 V1/V2 混用
 
 ### Real-time Diagnostics / 实时诊断 (v0.4.0+)
@@ -60,6 +61,7 @@ Lightweight & powerful HarmonyOS / OpenHarmony development toolkit for VS Code.
 ### Config File Intelligence / 配置文件智能 (v0.4.0+)
 
 - **Hover documentation / 悬浮文档** — bilingual (中/EN) docs when hovering over keys in `build-profile.json5`, `module.json5`, `app.json5`, `oh-package.json5` / 悬浮在配置文件键名上时显示中英文文档
+- **Modern HarmonyOS config awareness / 新版鸿蒙配置感知** — understands `targetSdkVersion`, `buildModeSet`, and `oh-package.json5` `modelVersion` / 识别 `targetSdkVersion`、`buildModeSet`、`oh-package.json5` `modelVersion`
 - Covers 40+ configuration keys across 4 config file types / 覆盖 4 种配置文件中的 40+ 个配置键
 
 ### OHPM Dependency Insight / OHPM 依赖洞察 (v0.4.0+)
@@ -141,6 +143,7 @@ Run `HarmonyOS: View Device Logs` to stream `hdc hilog` output to VS Code's Outp
 
 ### Project Tools / 项目工具
 - **Project creation wizard / 项目创建向导** — `HarmonyOS: Create New Project` with 4 templates (Empty, List, Tabs, Login) / 4 种模板（空白、列表、标签页、登录）
+- **Modern starter config / 新版起步工程配置** — generated templates use current-style `targetSdkVersion`, `buildModeSet`, and `oh-package modelVersion` / 新建模板默认输出新版构建配置写法
 - **Code actions / 代码操作** — right-click menu / 右键菜单：
   - Extract to `@Component` — extract selected UI code to a new component / 提取选中 UI 代码为新组件
   - Extract to `@Builder` — extract to a `@Builder` method / 提取为 `@Builder` 方法
@@ -183,9 +186,28 @@ Run `HarmonyOS: Preview Component` on any `.ets` file to see a live preview of t
 - **Auto-refresh on save / 保存自动刷新** — preview updates when switching files / 切换文件时预览自动更新
 - **Hover inspect / 悬浮检查** — hover to see component type labels / 悬浮查看组件类型标签
 
+## 解决哪些社区痛点 / What Pain Points We Address
+
+针对鸿蒙开发社区常见吐槽，本插件重点缓解以下问题：
+
+| 社区痛点 | 本插件能力 |
+|----------|------------|
+| **编译慢、等 20+ 分钟才见报错** | 实时诊断：不依赖 DevEco 全量编译，即时报 any/状态/性能问题 |
+| **环境配置繁琐、不知道缺啥** | `HarmonyOS: Check Environment` 一键检查 SDK/HDC/Command Line Tools/工程，并给出官方文档入口 |
+| **查 API/文档效率低** | 装饰器与配置键悬浮文档、`Search HarmonyOS Docs` 内置官方快捷入口、API 兼容性检查与废弃 API 提示 |
+| **新旧构建配置切换容易踩坑** | 同时识别 `targetSdkVersion` / `compileSdkVersion`，并补齐 `buildModeSet`、`oh-package modelVersion` 文档与模板 |
+| **V1/V2 混用、状态管理难上手** | V1/V2 混用诊断、一键迁移 V1→V2、状态陷阱与 Quick Fix |
+| **配置文件看不懂** | build-profile / module / app / oh-package 键名悬浮中英文说明 |
+| **不想装 DevEco、习惯 VS Code** | 构建/运行/调试/设备镜像/预览均在 VS Code 内完成，无需启动 DevEco |
+
+详细规划与优先级见 [docs/ROADMAP-社区痛点与规划.md](docs/ROADMAP-社区痛点与规划.md)。
+
+---
+
 ## Requirements / 环境要求
 
 - **HDC** (HarmonyOS Device Connector) in PATH, or configure `harmony.hdcPath` in settings / HDC 在 PATH 中，或在设置中配置 `harmony.hdcPath`
+- **HarmonyOS Command Line Tools** recommended (`sdkmgr`, `ohpm`, `codelinter`) / 推荐安装鸿蒙命令行工具
 - **hvigorw** — the project must contain `hvigorw` script in the root directory / 项目根目录需包含 `hvigorw` 脚本（标准鸿蒙项目）
 - A connected HarmonyOS device or emulator for build/run/debug features / 已连接的鸿蒙设备或模拟器（构建/运行/调试功能需要）
 
@@ -252,6 +274,7 @@ Built with a microkernel architecture for minimal footprint:
 | `HarmonyOS: Search HarmonyOS Docs` | Search official docs / 搜索官方文档 |
 | `HarmonyOS: Migrate V1 → V2 Decorators` | One-click V1 to V2 decorator migration / 一键 V1→V2 装饰器迁移 |
 | `HarmonyOS: Check API Compatibility` | Scan project for API version issues / 扫描项目 API 版本兼容问题 |
+| `HarmonyOS: Check Environment` | Check SDK / HDC / project setup and show doc links / 检查开发环境并输出文档链接 |
 
 ## License / 许可证
 

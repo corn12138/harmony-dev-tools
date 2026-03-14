@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
-import { resolveHdcPath } from '../utils/config';
-import { spawn } from 'child_process';
+import { spawnHdc } from '../utils/hdc';
 
-let logProcess: ReturnType<typeof spawn> | null = null;
+let logProcess: Awaited<ReturnType<typeof spawnHdc>> | null = null;
 let outputChannel: vscode.OutputChannel | null = null;
 
 export async function viewLogs(): Promise<void> {
@@ -17,10 +16,8 @@ export async function viewLogs(): Promise<void> {
   outputChannel.show();
   outputChannel.clear();
 
-  const hdc = await resolveHdcPath();
-
   try {
-    logProcess = spawn(hdc, ['hilog'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    logProcess = await spawnHdc(['hilog'], { stdio: ['ignore', 'pipe', 'pipe'] });
 
     logProcess.stdout?.on('data', (data: Buffer) => {
       outputChannel?.append(data.toString());

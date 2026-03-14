@@ -5,17 +5,12 @@ const RESOURCE_REF_REGEX = /\$r\s*\(\s*['"]([^'"]*)/;
 
 export class ResourceCompletionProvider implements vscode.CompletionItemProvider {
   private indexer = getResourceIndexer();
-  private initialized = false;
 
   async provideCompletionItems(
     document: vscode.TextDocument,
     position: vscode.Position
   ): Promise<vscode.CompletionItem[]> {
-    // Lazy init
-    if (!this.initialized) {
-      await this.indexer.rebuild();
-      this.initialized = true;
-    }
+    await this.indexer.ensureInitialized();
 
     const lineText = document.lineAt(position).text.substring(0, position.character);
     const match = lineText.match(RESOURCE_REF_REGEX);

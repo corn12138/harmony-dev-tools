@@ -1,6 +1,10 @@
 import * as vscode from 'vscode';
 import { resolveHdcPath } from '../utils/config';
-import { CONFIG_FILES } from '../utils/constants';
+import { buildHvigorCommand } from '../utils/hvigor';
+import { readBundleName, readEntryAbility } from '../utils/projectMetadata';
+import { getPreferredWorkspaceFolder } from '../utils/workspace';
+import { listConnectedDevices, type ConnectedDevice } from '../device/devices';
+import { buildHdcTargetArgs, buildHdcTerminalCommand, rawTerminalArg } from '../utils/hdc';
 
 let buildTerminal: vscode.Terminal | undefined;
 
@@ -9,25 +13,29 @@ let buildTerminal: vscode.Terminal | undefined;
  * so users can see real-time output (hvigor logs, install progress, etc.)
  */
 export async function terminalBuildAndRun(): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
+  const folder = getPreferredWorkspaceFolder();
   if (!folder) {
     vscode.window.showErrorMessage('No workspace folder open.');
     return;
   }
 
   const rootPath = folder.uri.fsPath;
-  const hdc = await resolveHdcPath();
+  const [hdc, bundleName, abilityName, device] = await Promise.all([
+    resolveHdcPath(),
+    readBundleName(folder.uri),
+    readEntryAbility(folder.uri),
+    selectDevice(),
+  ]);
 
-  // Read project info for launch command
-  const bundleName = await readBundleName(rootPath);
-  const abilityName = await readEntryAbility(rootPath);
+  if (!device) {
+    return;
+  }
 
   if (!bundleName) {
     vscode.window.showErrorMessage('Cannot find bundleName in AppScope/app.json5');
     return;
   }
 
-  // Dispose previous terminal if exists
   if (buildTerminal) {
     buildTerminal.dispose();
   }
@@ -36,39 +44,29 @@ export async function terminalBuildAndRun(): Promise<void> {
     name: 'HarmonyOS Run',
     cwd: rootPath,
     iconPath: new vscode.ThemeIcon('rocket'),
+    shellPath: process.platform === 'win32' ? 'powershell.exe' : undefined,
   });
 
   buildTerminal.show();
 
-  // Build the chained command
-  const ability = abilityName || 'EntryAbility';
-  const hapPattern = `$(find . -path "*/build/*/outputs/*/*.hap" -type f | head -1)`;
+  const commands = process.platform === 'win32'
+    ? buildPowerShellBuildAndRunCommand({
+        hdc,
+        deviceId: device.id,
+        bundleName,
+        abilityName: abilityName || 'EntryAbility',
+      })
+    : buildPosixBuildAndRunCommand({
+        hdc,
+        deviceId: device.id,
+        bundleName,
+        abilityName: abilityName || 'EntryAbility',
+      });
 
-  // Chain: build → find HAP → install → launch → notify
-  const commands = [
-    `echo "========== HarmonyOS Build & Run =========="`,
-    `echo "[1/4] Building HAP..."`,
-    `chmod +x ./hvigorw 2>/dev/null; ./hvigorw assembleHap --no-daemon`,
-    `echo ""`,
-    `echo "[2/4] Locating HAP output..."`,
-    `HAP_FILE=${hapPattern}`,
-    `if [ -z "$HAP_FILE" ]; then echo "ERROR: No .hap file found"; exit 1; fi`,
-    `echo "Found: $HAP_FILE"`,
-    `echo ""`,
-    `echo "[3/4] Installing to device..."`,
-    `${hdc} install "$HAP_FILE"`,
-    `echo ""`,
-    `echo "[4/4] Launching ${bundleName}/${ability}..."`,
-    `${hdc} shell "aa start -a ${ability} -b ${bundleName}"`,
-    `echo ""`,
-    `echo "========== App launched successfully =========="`,
-  ];
+  buildTerminal.sendText(commands, true);
 
-  buildTerminal.sendText(commands.join(' && '));
-
-  // Listen for terminal close
-  const disposable = vscode.window.onDidCloseTerminal((t) => {
-    if (t === buildTerminal) {
+  const disposable = vscode.window.onDidCloseTerminal((terminal) => {
+    if (terminal === buildTerminal) {
       buildTerminal = undefined;
       disposable.dispose();
     }
@@ -79,76 +77,190 @@ export async function terminalBuildAndRun(): Promise<void> {
  * Run only the launch step (skip build), assuming HAP is already installed.
  */
 export async function terminalRunOnly(): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) return;
-
-  const rootPath = folder.uri.fsPath;
-  const hdc = await resolveHdcPath();
-  const bundleName = await readBundleName(rootPath);
-  const abilityName = await readEntryAbility(rootPath) || 'EntryAbility';
-
-  if (!bundleName) {
-    vscode.window.showErrorMessage('Cannot find bundleName');
+  const folder = getPreferredWorkspaceFolder();
+  if (!folder) {
     return;
   }
 
-  const terminal = vscode.window.createTerminal({
-    name: 'HarmonyOS Launch',
-    cwd: rootPath,
-    iconPath: new vscode.ThemeIcon('debug-start'),
-  });
-  terminal.show();
-  terminal.sendText(`${hdc} shell "aa start -a ${abilityName} -b ${bundleName}"`);
+  const [hdc, bundleName, abilityName, device] = await Promise.all([
+    resolveHdcPath(),
+    readBundleName(folder.uri),
+    readEntryAbility(folder.uri),
+    selectDevice(),
+  ]);
+
+  if (!bundleName || !device) {
+    if (!bundleName) {
+      vscode.window.showErrorMessage('Cannot find bundleName');
+    }
+    return;
+  }
+
+  const terminal = createUtilityTerminal('HarmonyOS Launch', folder.uri.fsPath, 'debug-start');
+  terminal.sendText(buildLaunchCommand({
+    hdc,
+    deviceId: device.id,
+    bundleName,
+    abilityName: abilityName || 'EntryAbility',
+  }), true);
 }
 
 /**
  * Stop the running app on device.
  */
 export async function terminalStopApp(): Promise<void> {
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) return;
+  const folder = getPreferredWorkspaceFolder();
+  if (!folder) {
+    return;
+  }
 
-  const rootPath = folder.uri.fsPath;
-  const hdc = await resolveHdcPath();
-  const bundleName = await readBundleName(rootPath);
+  const [hdc, bundleName, device] = await Promise.all([
+    resolveHdcPath(),
+    readBundleName(folder.uri),
+    selectDevice(),
+  ]);
 
-  if (!bundleName) return;
+  if (!bundleName || !device) {
+    return;
+  }
 
   const terminal = vscode.window.activeTerminal
-    ?? vscode.window.createTerminal({ name: 'HarmonyOS', cwd: rootPath });
+    ?? createUtilityTerminal('HarmonyOS', folder.uri.fsPath);
+  terminal.sendText(buildStopCommand({ hdc, deviceId: device.id, bundleName }), true);
+}
+
+function createUtilityTerminal(
+  name: string,
+  cwd: string,
+  iconId = 'terminal',
+): vscode.Terminal {
+  const terminal = vscode.window.createTerminal({
+    name,
+    cwd,
+    iconPath: new vscode.ThemeIcon(iconId),
+    shellPath: process.platform === 'win32' ? 'powershell.exe' : undefined,
+  });
   terminal.show();
-  terminal.sendText(`${hdc} shell "aa force-stop ${bundleName}"`);
+  return terminal;
 }
 
-async function readBundleName(rootPath: string): Promise<string | null> {
-  try {
-    const uri = vscode.Uri.joinPath(
-      vscode.Uri.file(rootPath), 'AppScope', CONFIG_FILES.APP_JSON
-    );
-    const content = await vscode.workspace.fs.readFile(uri);
-    const text = Buffer.from(content).toString('utf8');
-    const match = text.match(/"bundleName"\s*:\s*"([^"]+)"/);
-    return match?.[1] ?? null;
-  } catch {
-    return null;
+async function selectDevice(): Promise<ConnectedDevice | undefined> {
+  const devices = await listConnectedDevices();
+  if (devices.length === 0) {
+    vscode.window.showWarningMessage('No HarmonyOS devices connected. Please connect a device first.');
+    return undefined;
   }
+
+  if (devices.length === 1) {
+    return devices[0];
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    devices.map((device) => ({
+      label: device.name,
+      description: device.id,
+      detail: device.status,
+      device,
+    })),
+    { placeHolder: 'Select a device' },
+  );
+
+  return pick?.device;
 }
 
-async function readEntryAbility(rootPath: string): Promise<string | null> {
-  try {
-    const moduleFiles = await vscode.workspace.findFiles(
-      '**/src/main/module.json5', '**/node_modules/**'
-    );
-    for (const file of moduleFiles) {
-      const content = await vscode.workspace.fs.readFile(file);
-      const text = Buffer.from(content).toString('utf8');
-      if (text.includes('"entry"') || text.includes("'entry'")) {
-        const m = text.match(/"name"\s*:\s*"(\w*Ability\w*)"/);
-        if (m) return m[1];
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
+function buildLaunchCommand(options: {
+  hdc: string;
+  deviceId: string;
+  bundleName: string;
+  abilityName: string;
+}): string {
+  const aaCommand = `aa start -a ${options.abilityName} -b ${options.bundleName}`;
+  return buildHdcTerminalCommand(
+    options.hdc,
+    [...buildHdcTargetArgs(options.deviceId), 'shell', aaCommand],
+  );
+}
+
+function buildStopCommand(options: {
+  hdc: string;
+  deviceId: string;
+  bundleName: string;
+}): string {
+  const stopCommand = `aa force-stop ${options.bundleName}`;
+  return buildHdcTerminalCommand(
+    options.hdc,
+    [...buildHdcTargetArgs(options.deviceId), 'shell', stopCommand],
+  );
+}
+
+function buildPosixBuildAndRunCommand(options: {
+  hdc: string;
+  deviceId: string;
+  bundleName: string;
+  abilityName: string;
+}): string {
+  const platform = process.platform === 'win32' ? 'linux' : process.platform;
+  const installCommand = buildHdcTerminalCommand(
+    options.hdc,
+    [...buildHdcTargetArgs(options.deviceId), 'install', rawTerminalArg('"$HAP_FILE"')],
+    platform,
+  );
+  const launchCommand = buildLaunchCommand(options);
+
+  return [
+    'echo "========== HarmonyOS Build & Run =========="',
+    'echo "[1/4] Building HAP..."',
+    buildHvigorCommand({ task: 'assembleHap' }),
+    'echo ""',
+    'echo "[2/4] Locating HAP output..."',
+    'SIGNED_HAP="$(find . -path "*/build/*/outputs/*/*signed*.hap" -type f | head -1)"',
+    'HAP_FILE="${SIGNED_HAP:-$(find . -path "*/build/*/outputs/*/*.hap" -type f | head -1)}"',
+    'if [ -z "$HAP_FILE" ]; then echo "ERROR: No .hap file found"; exit 1; fi',
+    'echo "Found: $HAP_FILE"',
+    'echo ""',
+    'echo "[3/4] Installing to device..."',
+    installCommand,
+    'echo ""',
+    `echo "[4/4] Launching ${options.bundleName}/${options.abilityName}..."`,
+    launchCommand,
+    'echo ""',
+    'echo "========== App launched successfully =========="',
+  ].join(' && ');
+}
+
+function buildPowerShellBuildAndRunCommand(options: {
+  hdc: string;
+  deviceId: string;
+  bundleName: string;
+  abilityName: string;
+}): string {
+  const installCommand = buildHdcTerminalCommand(
+    options.hdc,
+    [...buildHdcTargetArgs(options.deviceId), 'install', rawTerminalArg('$hap.FullName')],
+    'win32',
+  );
+  const launchCommand = buildLaunchCommand(options);
+
+  return [
+    '$ErrorActionPreference = "Stop"',
+    'Write-Host "========== HarmonyOS Build & Run =========="',
+    'Write-Host "[1/4] Building HAP..."',
+    '& .\\hvigorw.bat assembleHap --no-daemon',
+    'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+    'Write-Host ""',
+    'Write-Host "[2/4] Locating HAP output..."',
+    '$hap = Get-ChildItem -Path . -Recurse -Filter *.hap | Where-Object { $_.FullName -match "\\\\build\\\\" -and $_.FullName -match "\\\\outputs\\\\" } | Sort-Object @{ Expression = { $_.FullName -notmatch "signed" } }, FullName | Select-Object -First 1',
+    'if (-not $hap) { Write-Error "No .hap file found"; exit 1 }',
+    'Write-Host ("Found: " + $hap.FullName)',
+    'Write-Host ""',
+    'Write-Host "[3/4] Installing to device..."',
+    installCommand,
+    'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+    'Write-Host ""',
+    `Write-Host "[4/4] Launching ${options.bundleName}/${options.abilityName}..."`,
+    launchCommand,
+    'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+    'Write-Host ""',
+    'Write-Host "========== App launched successfully =========="',
+  ].join('; ');
 }

@@ -1,10 +1,7 @@
 import * as vscode from 'vscode';
-import { resolveHdcPath } from '../utils/config';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { detectEmulators, type EmulatorInfo } from './emulatorManager';
-
-const execAsync = promisify(exec);
+import { listConnectedDevices } from './devices';
+import type { HarmonyEventBus } from '../core/eventBus';
 
 type TreeNode = DeviceItem | SectionItem;
 
@@ -32,28 +29,22 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<TreeNode | Em
   private timer?: ReturnType<typeof setInterval>;
   private devices: DeviceItem[] = [];
   private emulators: EmulatorInfo[] = [];
+  private lastDeviceIds = new Set<string>();
 
-  constructor() {
+  constructor(private readonly eventBus?: HarmonyEventBus) {
     const interval = vscode.workspace.getConfiguration('harmony').get<number>('devicePollInterval', 5000);
     this.timer = setInterval(() => this.refresh(), interval);
-    this.refresh();
+    void this.refresh();
   }
 
   async refresh(): Promise<void> {
-    const hdc = await resolveHdcPath();
-    try {
-      const { stdout } = await execAsync(`${hdc} list targets`, { timeout: 3000 });
-      this.devices = stdout.trim().split('\n')
-        .filter((l) => l.trim() && !l.includes('[Empty]'))
-        .map((id) => ({
-          kind: 'device' as const,
-          id: id.trim(),
-          name: id.trim(),
-          status: 'online' as const,
-        }));
-    } catch {
-      this.devices = [];
-    }
+    const connectedDevices = await listConnectedDevices();
+    this.devices = connectedDevices.map((device) => ({
+      kind: 'device' as const,
+      id: device.id,
+      name: device.name,
+      status: device.status,
+    }));
 
     try {
       this.emulators = detectEmulators();
@@ -67,6 +58,7 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<TreeNode | Em
       this.emulators = [];
     }
 
+    this.emitDeviceChanges(connectedDevices);
     this._onDidChange.fire();
   }
 
@@ -153,5 +145,27 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<TreeNode | Em
   dispose(): void {
     if (this.timer) clearInterval(this.timer);
     this._onDidChange.dispose();
+  }
+
+  private emitDeviceChanges(devices: Array<{ id: string; name: string; type: string }>): void {
+    if (!this.eventBus) {
+      this.lastDeviceIds = new Set(devices.map((device) => device.id));
+      return;
+    }
+
+    const nextIds = new Set(devices.map((device) => device.id));
+    for (const device of devices) {
+      if (!this.lastDeviceIds.has(device.id)) {
+        this.eventBus.emit('device:connected', device);
+      }
+    }
+
+    for (const previousId of this.lastDeviceIds) {
+      if (!nextIds.has(previousId)) {
+        this.eventBus.emit('device:disconnected', { id: previousId });
+      }
+    }
+
+    this.lastDeviceIds = nextIds;
   }
 }

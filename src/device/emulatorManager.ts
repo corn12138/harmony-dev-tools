@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec, ChildProcess } from 'child_process';
 import { promisify } from 'util';
-import { resolveHdcPath } from '../utils/config';
+import { listHdcTargets } from '../utils/hdc';
 
 const execAsync = promisify(exec);
 
@@ -193,13 +193,11 @@ async function startEmulatorProcess(binary: string, emulator: EmulatorInfo): Pro
           runningProcess = undefined;
         });
 
-        const hdc = await resolveHdcPath();
         for (let i = 0; i < 30; i++) {
           if (token.isCancellationRequested) return;
           await sleep(2000);
           try {
-            const { stdout } = await execAsync(`${hdc} list targets`, { timeout: 3000 });
-            if (stdout.trim() && !stdout.includes('[Empty]')) {
+            if ((await listHdcTargets(3000)).length > 0) {
               progress.report({ message: 'Emulator online!' });
               vscode.window.showInformationMessage(
                 `Emulator "${emulator.name}" is running.`,
@@ -253,11 +251,7 @@ export async function getEmulatorStatus(): Promise<EmulatorInfo[]> {
 
   let onlineDevices: string[] = [];
   try {
-    const hdc = await resolveHdcPath();
-    const { stdout } = await execAsync(`${hdc} list targets`, { timeout: 3000 });
-    onlineDevices = stdout.trim().split('\n')
-      .filter(l => l.trim() && !l.includes('[Empty]'))
-      .map(l => l.trim());
+    onlineDevices = await listHdcTargets(3000);
   } catch { /* ignore */ }
 
   for (const emu of emulators) {

@@ -3,6 +3,13 @@ import * as vscode from 'vscode';
 export interface HarmonyEvents {
   'project:detected': { rootPath: string; modules: string[] };
   'project:configChanged': { file: string; type: string };
+  'project:fileChanged': { file: string; kind: string; change: 'created' | 'changed' | 'deleted'; module?: string };
+  'project:indexUpdated': {
+    rootPath: string;
+    modules: string[];
+    files: Array<{ path: string; kind: string; module?: string }>;
+    counts: Record<string, number>;
+  };
   'build:started': { task: string; module?: string };
   'build:completed': { task: string; success: boolean; duration: number };
   'build:error': { message: string; file?: string; line?: number };

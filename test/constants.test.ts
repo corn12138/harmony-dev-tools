@@ -65,10 +65,13 @@ describe('constants', () => {
   });
 
   describe('API_VERSIONS', () => {
-    it('should define API 12, 13, 14', () => {
+    it('should define legacy and modern HarmonyOS api levels', () => {
       expect(API_VERSIONS.API_12).toBe(12);
       expect(API_VERSIONS.API_13).toBe(13);
       expect(API_VERSIONS.API_14).toBe(14);
+      expect(API_VERSIONS.API_17).toBe(17);
+      expect(API_VERSIONS.API_20).toBe(20);
+      expect(API_VERSIONS.API_22).toBe(22);
     });
   });
 
@@ -91,6 +94,7 @@ describe('constants', () => {
       expect(CONFIG_FILES.OH_PACKAGE).toBe('oh-package.json5');
       expect(CONFIG_FILES.MODULE_JSON).toBe('module.json5');
       expect(CONFIG_FILES.APP_JSON).toBe('app.json5');
+      expect(CONFIG_FILES.HVIGOR_CONFIG).toBe('hvigor-config.json5');
     });
   });
 });

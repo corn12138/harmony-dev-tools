@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { getDecorators, getComponents, apiLabel, type DecoratorMeta } from '../utils/metadata';
+import { detectHarmonySdkFromBuildProfile } from '../utils/harmonySdk';
+import { getPreferredWorkspaceFolder } from '../utils/workspace';
 
 // ---------------------------------------------------------------------------
 // Diagnostic codes — referenced by codeFixProvider for Quick Fix matching
@@ -63,15 +65,12 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
   let cachedApiLevel: number | undefined;
 
   const detectProjectApi = async () => {
-    const rootUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+    const rootUri = getPreferredWorkspaceFolder()?.uri;
     if (!rootUri) return;
     try {
       const bp = vscode.Uri.joinPath(rootUri, 'build-profile.json5');
       const raw = Buffer.from(await vscode.workspace.fs.readFile(bp)).toString('utf8');
-      const m = raw.match(/["']?compileSdkVersion["']?\s*[:=]\s*(\d+)/);
-      if (m) { cachedApiLevel = parseInt(m[1], 10); return; }
-      const m2 = raw.match(/["']?compatibleSdkVersion["']?\s*[:=]\s*(\d+)/);
-      if (m2) { cachedApiLevel = parseInt(m2[1], 10); }
+      cachedApiLevel = detectHarmonySdkFromBuildProfile(raw)?.apiLevel ?? undefined;
     } catch { /* no build-profile */ }
   };
 

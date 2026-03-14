@@ -18,8 +18,7 @@ export function getHdcPath(): string {
   return getConfig<string>('hdcPath', '');
 }
 
-// Cached resolved HDC path to avoid repeated filesystem scans
-let resolvedHdcPath: string | null = null;
+const resolvedToolPaths = new Map<string, string>();
 
 /**
  * Auto-detect HDC executable.
@@ -30,37 +29,41 @@ export async function resolveHdcPath(): Promise<string> {
   // 1. User explicitly configured path
   const configured = getHdcPath();
   if (configured && fs.existsSync(configured)) {
-    resolvedHdcPath = configured;
+    resolvedToolPaths.set('hdc', configured);
     return configured;
   }
 
-  // 2. Return cached result if already resolved
-  if (resolvedHdcPath) return resolvedHdcPath;
+  const resolved = await resolveToolPath('hdc');
+  return resolved ?? 'hdc';
+}
 
-  // 3. Try system PATH (which/where)
-  try {
-    const cmd = process.platform === 'win32' ? 'where hdc' : 'which hdc';
-    const { stdout } = await execAsync(cmd, { timeout: 3000 });
-    const found = stdout.trim().split('\n')[0].trim();
-    if (found && fs.existsSync(found)) {
-      resolvedHdcPath = found;
-      return found;
-    }
-  } catch {
-    // not in PATH, continue searching
+/**
+ * Resolve a tool from PATH, known SDK roots, or HarmonyOS command-line-tools.
+ */
+export async function resolveToolPath(toolName: 'hdc' | 'sdkmgr' | 'ohpm' | 'codelinter'): Promise<string | null> {
+  const cached = resolvedToolPaths.get(toolName);
+  if (cached) {
+    return cached;
   }
 
-  // 4. Scan well-known SDK locations
-  const candidates = getHdcCandidatePaths();
+  const fromPath = await resolveExecutableFromPath(toolName);
+  if (fromPath) {
+    resolvedToolPaths.set(toolName, fromPath);
+    return fromPath;
+  }
+
+  const candidates = toolName === 'hdc'
+    ? getHdcCandidatePaths()
+    : getCommandLineToolCandidatePaths(toolName);
+
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
-      resolvedHdcPath = candidate;
+      resolvedToolPaths.set(toolName, candidate);
       return candidate;
     }
   }
 
-  // 5. Fallback — return 'hdc' and let the caller handle the error
-  return 'hdc';
+  return null;
 }
 
 /**
@@ -107,6 +110,7 @@ function getHdcCandidatePaths(): string[] {
     }
   }
 
+  candidates.push(...getCommandLineToolCandidatePaths('hdc'));
   return candidates;
 }
 
@@ -124,6 +128,83 @@ function findHdcInSdkRoot(sdkRoot: string, hdcBin: string): string[] {
   } catch {
     return [];
   }
+}
+
+function getCommandLineToolCandidatePaths(toolName: 'hdc' | 'sdkmgr' | 'ohpm' | 'codelinter'): string[] {
+  const candidates: string[] = [];
+  const binaryNames = process.platform === 'win32'
+    ? [`${toolName}.exe`, `${toolName}.cmd`, `${toolName}.bat`]
+    : [toolName];
+
+  for (const root of getCommandLineToolRoots()) {
+    for (const binaryName of binaryNames) {
+      candidates.push(path.join(root, 'bin', binaryName));
+      candidates.push(path.join(root, 'tools', binaryName));
+      candidates.push(path.join(root, 'sdk', 'default', 'openharmony', 'toolchains', binaryName));
+      candidates.push(path.join(root, 'sdk', 'default', 'harmonyos', 'toolchains', binaryName));
+      candidates.push(path.join(root, 'sdk', 'default', 'openharmony', 'toolchains', toolName, 'bin', binaryName));
+      candidates.push(path.join(root, 'sdk', 'default', 'harmonyos', 'toolchains', toolName, 'bin', binaryName));
+    }
+  }
+
+  return Array.from(new Set(candidates));
+}
+
+function getCommandLineToolRoots(): string[] {
+  const home = process.env.HOME || process.env.USERPROFILE || '';
+  const localAppData = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
+  const roots: string[] = [];
+
+  if (process.platform === 'darwin') {
+    roots.push(
+      path.join(home, 'Library', 'Harmony', 'command-line-tools'),
+      path.join(home, 'Library', 'Huawei', 'command-line-tools'),
+      path.join(home, 'Library', 'HarmonyOS', 'command-line-tools'),
+      path.join(home, 'Library', 'OpenHarmony', 'command-line-tools'),
+      '/Applications/DevEco-Studio.app/Contents/command-line-tools',
+    );
+  } else if (process.platform === 'win32') {
+    roots.push(
+      path.join(localAppData, 'Harmony', 'command-line-tools'),
+      path.join(localAppData, 'Huawei', 'command-line-tools'),
+      path.join(localAppData, 'HarmonyOS', 'command-line-tools'),
+      path.join(localAppData, 'OpenHarmony', 'command-line-tools'),
+      'C:\\DevEcoStudio\\command-line-tools',
+      'C:\\Program Files\\Huawei\\DevEco Studio\\command-line-tools',
+    );
+  } else {
+    roots.push(
+      path.join(home, 'Harmony', 'command-line-tools'),
+      path.join(home, 'Huawei', 'command-line-tools'),
+      path.join(home, 'HarmonyOS', 'command-line-tools'),
+      path.join(home, 'OpenHarmony', 'command-line-tools'),
+    );
+  }
+
+  const configuredSdk = getSdkPath();
+  if (configuredSdk) {
+    roots.push(
+      path.join(configuredSdk, '..', '..', 'command-line-tools'),
+      path.join(configuredSdk, '..', 'command-line-tools'),
+    );
+  }
+
+  return Array.from(new Set(roots.map((root) => path.resolve(root))));
+}
+
+async function resolveExecutableFromPath(toolName: string): Promise<string | null> {
+  try {
+    const cmd = process.platform === 'win32' ? `where ${toolName}` : `which ${toolName}`;
+    const { stdout } = await execAsync(cmd, { timeout: 3000 });
+    const found = stdout.trim().split('\n')[0].trim();
+    if (found && fs.existsSync(found)) {
+      return found;
+    }
+  } catch {
+    // not in PATH, continue searching
+  }
+
+  return null;
 }
 
 /**
@@ -149,7 +230,7 @@ export async function promptHdcConfiguration(): Promise<string | null> {
     if (picked?.[0]) {
       const hdcPath = picked[0].fsPath;
       await vscode.workspace.getConfiguration('harmony').update('hdcPath', hdcPath, true);
-      resolvedHdcPath = hdcPath;
+      resolvedToolPaths.set('hdc', hdcPath);
       vscode.window.showInformationMessage(`HDC path saved: ${hdcPath}`);
       return hdcPath;
     }
