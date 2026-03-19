@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.6.8] - 2026-03-19
+- Added project-level permission diagnostics that align `module.json5 -> requestPermissions` with `requestPermissionsFromUser()` calls in Ability files, including undeclared permissions, missing `reason`, and `usedScene.abilities` mismatches.
+- Added warnings for duplicate `requestPermissions` entries, unknown `usedScene.abilities` references, and missing `$string:` resources used by permission `reason`.
+- Added `Open WebView DevTools`, a one-click ArkWeb workflow that detects `setWebDebuggingAccess(true)`, checks `ohos.permission.INTERNET`, discovers the active `webview_devtools_remote_*` socket, prepares USB `hdc fport`, and opens `chrome://inspect/#devices`.
+- Added project-aware WebView DevTools guidance so API 20+ wireless `setWebDebuggingAccess(true, port)` setups are recognized and routed to the right Chrome inspect flow instead of the USB socket flow.
+- Added lightweight project diagnostics for WebView DevTools readiness when a module uses `Web(...)` but does not enable `setWebDebuggingAccess(true)` or does not declare `ohos.permission.INTERNET`.
+- Added official docs shortcuts for the HarmonyOS permission request guide, the latest `module.json5` configuration reference, and ArkWeb WebView DevTools debugging guidance.
+
 ## [0.6.7] - 2026-03-19
 - Reduced project-config diagnostic flicker by replacing `collection.clear()` refreshes with per-workspace snapshots, and by refreshing only the affected workspace folder for document-driven updates.
 - Prevented overlapping HDC status-bar polls from piling up when `hdc list targets` is slow, so the active-device indicator no longer races stale results back onto the UI.

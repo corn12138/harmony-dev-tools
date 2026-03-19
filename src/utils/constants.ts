@@ -29,6 +29,7 @@ export const COMMANDS = {
   EXTRACT_STRING: 'harmony.extractString',
   MANAGE_DEPS: 'harmony.manageDeps',
   OPEN_DOCS: 'harmony.openDocs',
+  OPEN_WEBVIEW_DEVTOOLS: 'harmony.openWebViewDevTools',
   UI_INSPECTOR: 'harmony.uiInspector',
   TAKE_SCREENSHOT: 'harmony.takeScreenshot',
   BUILD_AND_RUN: 'harmony.buildAndRun',

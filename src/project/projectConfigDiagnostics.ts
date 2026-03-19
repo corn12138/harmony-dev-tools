@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { extractJson5StringValue } from '../utils/json5';
 import { analyzeBuildProfileMigration } from './buildProfileMigration';
 import { resolveSigningProfileInfo } from './signingProfile';
+import { hasWebViewUsage, parseWebDebuggingAccess } from '../webview/projectAnalysis';
 
 export const PROJECT_CONFIG_DIAG_SOURCE = 'HarmonyOS Project';
 
@@ -26,6 +27,14 @@ export const PROJECT_CONFIG_DIAG_CODES = {
   ROUTE_BUILDER_DECORATOR_MISSING: 'harmony-route-builder-decorator-missing',
   NAVIGATION_ROUTE_UNKNOWN: 'harmony-navigation-route-unknown',
   SIGNING_BUNDLE_NAME_MISMATCH: 'harmony-signing-bundle-name-mismatch',
+  PERMISSION_DUPLICATE: 'harmony-permission-duplicate',
+  PERMISSION_USED_SCENE_UNKNOWN_ABILITY: 'harmony-permission-used-scene-unknown-ability',
+  PERMISSION_REASON_RESOURCE_MISSING: 'harmony-permission-reason-resource-missing',
+  PERMISSION_RUNTIME_UNDECLARED: 'harmony-permission-runtime-undeclared',
+  PERMISSION_RUNTIME_REASON_MISSING: 'harmony-permission-runtime-reason-missing',
+  PERMISSION_RUNTIME_ABILITY_MISMATCH: 'harmony-permission-runtime-ability-mismatch',
+  WEBVIEW_DEBUG_ACCESS_MISSING: 'harmony-webview-debug-access-missing',
+  WEBVIEW_INTERNET_PERMISSION_MISSING: 'harmony-webview-internet-permission-missing',
 } as const;
 
 type ProjectConfigDiagCode = (typeof PROJECT_CONFIG_DIAG_CODES)[keyof typeof PROJECT_CONFIG_DIAG_CODES];
@@ -34,9 +43,11 @@ interface AnalysisIssue {
   code: ProjectConfigDiagCode;
   message: string;
   severity: vscode.DiagnosticSeverity;
-  target: 'buildProfile' | 'module' | 'pages' | 'entryAbility' | 'page' | 'app';
+  target: 'buildProfile' | 'module' | 'pages' | 'entryAbility' | 'ability' | 'page' | 'app' | 'arkts';
   needle?: string;
   route?: string;
+  abilityName?: string;
+  documentKey?: string;
 }
 
 interface StartupAnalysisInput {
@@ -61,6 +72,20 @@ export interface RouteMapEntry {
 export interface NavigationRouteUsage {
   routeName: string;
   api: string;
+  needle: string;
+}
+
+export interface RequestPermissionEntry {
+  name: string;
+  reason?: string;
+  reasonResourceKey?: string;
+  abilities: string[];
+  when?: string;
+}
+
+export interface RuntimePermissionRequest {
+  permissionName: string;
+  abilityName: string;
   needle: string;
 }
 
@@ -125,6 +150,34 @@ function findJson5ArrayBlock(text: string, key: string): string | undefined {
   }
 
   return text.slice(arrayStart + 1, arrayEnd);
+}
+
+function findJson5ObjectBlock(text: string, key: string): string | undefined {
+  const match = text.match(new RegExp(`(?:["']${escapeRegExp(key)}["']|\\b${escapeRegExp(key)}\\b)\\s*:\\s*\\{`));
+  if (!match || match.index === undefined) {
+    return undefined;
+  }
+
+  const objectStart = text.indexOf('{', match.index);
+  if (objectStart < 0) {
+    return undefined;
+  }
+
+  const objectEnd = findMatchingBracket(text, objectStart, '{', '}');
+  if (objectEnd < 0) {
+    return undefined;
+  }
+
+  return text.slice(objectStart + 1, objectEnd);
+}
+
+function extractJson5StringArray(text: string, key: string): string[] {
+  const block = findJson5ArrayBlock(text, key);
+  if (!block) {
+    return [];
+  }
+
+  return Array.from(block.matchAll(/['"]([^'"]+)['"]/g)).map((item) => item[1]);
 }
 
 function splitTopLevelObjects(arrayText: string): string[] {
@@ -238,6 +291,235 @@ export function extractNavigationRouteUsages(text: string): NavigationRouteUsage
   }
 
   return usages;
+}
+
+export function parseRequestPermissionEntries(moduleText: string): RequestPermissionEntry[] {
+  const permissionsBlock = findJson5ArrayBlock(moduleText, 'requestPermissions');
+  if (!permissionsBlock) {
+    return [];
+  }
+
+  const entries: RequestPermissionEntry[] = [];
+  for (const item of splitTopLevelObjects(permissionsBlock)) {
+    const name = extractJson5StringValue(item, 'name');
+    if (!name) {
+      continue;
+    }
+
+    const reason = extractJson5StringValue(item, 'reason');
+    const usedScene = findJson5ObjectBlock(item, 'usedScene');
+    entries.push({
+      name,
+      reason,
+      reasonResourceKey: reason?.startsWith('$string:') ? reason.slice('$string:'.length) : undefined,
+      abilities: usedScene ? extractJson5StringArray(usedScene, 'abilities') : [],
+      when: usedScene ? extractJson5StringValue(usedScene, 'when') : undefined,
+    });
+  }
+
+  return entries;
+}
+
+export function extractRuntimePermissionRequests(
+  abilityName: string,
+  abilityText: string,
+): RuntimePermissionRequest[] {
+  if (!/\brequestPermissionsFromUser\s*\(/.test(abilityText)) {
+    return [];
+  }
+
+  const requests: RuntimePermissionRequest[] = [];
+  const callPattern = /\brequestPermissionsFromUser\s*\(/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = callPattern.exec(abilityText)) !== null) {
+    const openParen = abilityText.indexOf('(', match.index);
+    if (openParen < 0) {
+      continue;
+    }
+
+    const closeParen = findMatchingBracket(abilityText, openParen, '(', ')');
+    if (closeParen < 0) {
+      continue;
+    }
+
+    const args = abilityText.slice(openParen + 1, closeParen);
+    for (const permissionMatch of args.matchAll(/['"](ohos\.permission\.[A-Z0-9_.]+)['"]/g)) {
+      requests.push({
+        permissionName: permissionMatch[1],
+        abilityName,
+        needle: permissionMatch[1],
+      });
+    }
+
+    callPattern.lastIndex = closeParen + 1;
+  }
+
+  return requests;
+}
+
+export function collectStringResourceKeys(text: string): Set<string> {
+  try {
+    const parsed = JSON.parse(text) as { string?: Array<{ name?: string }> };
+    const names = Array.isArray(parsed.string)
+      ? parsed.string
+        .filter((item): item is { name: string } => typeof item?.name === 'string')
+        .map((item) => item.name)
+      : [];
+    return new Set(names);
+  } catch {
+    return new Set(Array.from(text.matchAll(/"name"\s*:\s*"([^"]+)"/g)).map((item) => item[1]));
+  }
+}
+
+export function analyzePermissionConfiguration(args: {
+  moduleText: string;
+  abilityTexts: Record<string, string | undefined>;
+  stringResourceKeys?: Set<string>;
+}): AnalysisIssue[] {
+  const issues: AnalysisIssue[] = [];
+  const abilityNames = new Set(extractAbilityEntries(args.moduleText).map((item) => item.name));
+  const declarations = parseRequestPermissionEntries(args.moduleText);
+  const declarationsByName = new Map<string, RequestPermissionEntry>();
+  const seenNames = new Set<string>();
+
+  for (const declaration of declarations) {
+    if (seenNames.has(declaration.name)) {
+      issues.push({
+        code: PROJECT_CONFIG_DIAG_CODES.PERMISSION_DUPLICATE,
+        message: `requestPermissions 中重复声明了 ${declaration.name}，同一个权限只应保留一个配置项。`,
+        severity: vscode.DiagnosticSeverity.Warning,
+        target: 'module',
+        needle: declaration.name,
+      });
+      continue;
+    }
+
+    seenNames.add(declaration.name);
+    declarationsByName.set(declaration.name, declaration);
+
+    for (const abilityName of declaration.abilities) {
+      if (abilityNames.has(abilityName)) {
+        continue;
+      }
+      issues.push({
+        code: PROJECT_CONFIG_DIAG_CODES.PERMISSION_USED_SCENE_UNKNOWN_ABILITY,
+        message: `权限 ${declaration.name} 的 usedScene.abilities 引用了不存在的 Ability：${abilityName}。`,
+        severity: vscode.DiagnosticSeverity.Warning,
+        target: 'module',
+        needle: abilityName,
+      });
+    }
+
+    if (
+      declaration.reason
+      && declaration.reasonResourceKey
+      && args.stringResourceKeys
+      && !args.stringResourceKeys.has(declaration.reasonResourceKey)
+    ) {
+      issues.push({
+        code: PROJECT_CONFIG_DIAG_CODES.PERMISSION_REASON_RESOURCE_MISSING,
+        message: `权限 ${declaration.name} 的 reason 引用了不存在的字符串资源：${declaration.reason}。`,
+        severity: vscode.DiagnosticSeverity.Warning,
+        target: 'module',
+        needle: declaration.reason,
+      });
+    }
+  }
+
+  for (const [abilityName, abilityText] of Object.entries(args.abilityTexts)) {
+    if (!abilityText) {
+      continue;
+    }
+
+    for (const request of extractRuntimePermissionRequests(abilityName, abilityText)) {
+      const declaration = declarationsByName.get(request.permissionName);
+      if (!declaration) {
+        issues.push({
+          code: PROJECT_CONFIG_DIAG_CODES.PERMISSION_RUNTIME_UNDECLARED,
+          message: `${abilityName} 调用了 requestPermissionsFromUser() 申请 ${request.permissionName}，但 module.json5 的 requestPermissions 里没有声明它。`,
+          severity: vscode.DiagnosticSeverity.Warning,
+          target: 'ability',
+          abilityName,
+          needle: request.needle,
+        });
+        continue;
+      }
+
+      if (!declaration.reason) {
+        issues.push({
+          code: PROJECT_CONFIG_DIAG_CODES.PERMISSION_RUNTIME_REASON_MISSING,
+          message: `${request.permissionName} 在 module.json5 中缺少 reason。根据官方权限申请指南，运行时动态申请前应补上用户可见的申请原因。`,
+          severity: vscode.DiagnosticSeverity.Warning,
+          target: 'ability',
+          abilityName,
+          needle: request.needle,
+        });
+      }
+
+      if (!declaration.abilities.includes(abilityName)) {
+        issues.push({
+          code: PROJECT_CONFIG_DIAG_CODES.PERMISSION_RUNTIME_ABILITY_MISMATCH,
+          message: `${abilityName} 正在申请 ${request.permissionName}，但 module.json5 的 usedScene.abilities 未包含该 Ability。`,
+          severity: vscode.DiagnosticSeverity.Warning,
+          target: 'ability',
+          abilityName,
+          needle: request.needle,
+        });
+      }
+    }
+  }
+
+  return issues;
+}
+
+export function analyzeWebViewDebuggingConfiguration(args: {
+  moduleText: string;
+  arkTsTexts: Record<string, string | undefined>;
+}): AnalysisIssue[] {
+  const issues: AnalysisIssue[] = [];
+  const webViewFiles = Object.entries(args.arkTsTexts).reduce<Array<[string, string]>>((items, [documentKey, text]) => {
+    if (!text || !hasWebViewUsage(text)) {
+      return items;
+    }
+    items.push([documentKey, text]);
+    return items;
+  }, []);
+
+  if (webViewFiles.length === 0) {
+    return issues;
+  }
+
+  const hasInternetPermission = parseRequestPermissionEntries(args.moduleText)
+    .some((item) => item.name === 'ohos.permission.INTERNET');
+
+  if (!hasInternetPermission) {
+    issues.push({
+      code: PROJECT_CONFIG_DIAG_CODES.WEBVIEW_INTERNET_PERMISSION_MISSING,
+      message: '检测到 Web 组件，但 module.json5 里还没有声明 ohos.permission.INTERNET。若页面需要访问网络内容，或要按官方 WebView DevTools 文档联调，请补充该权限。',
+      severity: vscode.DiagnosticSeverity.Information,
+      target: 'module',
+      needle: 'requestPermissions',
+    });
+  }
+
+  const hasDebugAccess = webViewFiles.some(([, text]) => Boolean(parseWebDebuggingAccess(text)));
+  if (hasDebugAccess) {
+    return issues;
+  }
+
+  for (const [documentKey, text] of webViewFiles) {
+    issues.push({
+      code: PROJECT_CONFIG_DIAG_CODES.WEBVIEW_DEBUG_ACCESS_MISSING,
+      message: '检测到 Web 组件，但当前工程还没有找到 setWebDebuggingAccess(true)。如需使用 ArkWeb WebView DevTools，请先在应用代码里开启 Web 调试。',
+      severity: vscode.DiagnosticSeverity.Information,
+      target: 'arkts',
+      documentKey,
+      needle: text.includes('WebviewController') ? 'WebviewController' : 'Web',
+    });
+  }
+
+  return issues;
 }
 
 function toRelativeProfilePath(pagesRef: string): string | undefined {
@@ -462,6 +744,27 @@ async function safeReadText(uri: vscode.Uri): Promise<string | undefined> {
   }
 }
 
+async function collectModuleStringResourceKeys(moduleRoot: string): Promise<Set<string>> {
+  const files = await vscode.workspace.findFiles(
+    new vscode.RelativePattern(vscode.Uri.file(moduleRoot), 'src/main/resources/**/string.json'),
+    '**/node_modules/**',
+    20,
+  );
+
+  const keys = new Set<string>();
+  for (const uri of files) {
+    const text = await safeReadText(uri);
+    if (!text) {
+      continue;
+    }
+    for (const key of collectStringResourceKeys(text)) {
+      keys.add(key);
+    }
+  }
+
+  return keys;
+}
+
 function isConfigDocument(document: vscode.TextDocument): boolean {
   return document.fileName.endsWith('build-profile.json5')
     || document.fileName.endsWith(path.join('AppScope', 'app.json5'))
@@ -556,19 +859,25 @@ async function analyzeWorkspaceFolder(
 
     const pagesRef = extractJson5StringValue(moduleText, 'pages');
     const moduleRoot = path.dirname(path.dirname(path.dirname(moduleUri.fsPath)));
+    const stringResourceKeys = await collectModuleStringResourceKeys(moduleRoot);
     const pagesRelativePath = pagesRef ? toRelativeProfilePath(pagesRef) : undefined;
     const pagesUri = pagesRelativePath ? vscode.Uri.file(path.join(moduleRoot, pagesRelativePath)) : undefined;
     const pagesText = pagesUri ? await safeReadText(pagesUri) : undefined;
 
     const mainElement = extractJson5StringValue(moduleText, 'mainElement');
     const abilityEntries = extractAbilityEntries(moduleText);
+    const abilityUris = new Map<string, vscode.Uri>();
+    const abilityTexts: Record<string, string | undefined> = {};
+    for (const ability of abilityEntries) {
+      const abilityUri = vscode.Uri.file(path.join(moduleRoot, 'src', 'main', ability.srcEntry.replace(/^\.\//, '')));
+      abilityUris.set(ability.name, abilityUri);
+      abilityTexts[ability.name] = await safeReadText(abilityUri);
+    }
     const entryAbility = mainElement
       ? abilityEntries.find((item) => item.name === mainElement)
       : abilityEntries[0];
-    const entryAbilityUri = entryAbility
-      ? vscode.Uri.file(path.join(moduleRoot, 'src', 'main', entryAbility.srcEntry.replace(/^\.\//, '')))
-      : undefined;
-    const entryAbilityText = entryAbilityUri ? await safeReadText(entryAbilityUri) : undefined;
+    const entryAbilityUri = entryAbility ? abilityUris.get(entryAbility.name) : undefined;
+    const entryAbilityText = entryAbility ? abilityTexts[entryAbility.name] : undefined;
 
     const pageTexts: Record<string, string | undefined> = {};
     if (pagesText) {
@@ -576,6 +885,18 @@ async function analyzeWorkspaceFolder(
         const pageUri = vscode.Uri.file(path.join(moduleRoot, 'src', 'main', 'ets', `${route}.ets`));
         pageTexts[route] = await safeReadText(pageUri);
       }
+    }
+
+    const moduleEtsFiles = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(vscode.Uri.file(moduleRoot), 'src/main/**/*.ets'),
+      '**/node_modules/**',
+    );
+    const moduleArkTsTexts: Record<string, string | undefined> = {};
+    const moduleArkTsUris = new Map<string, vscode.Uri>();
+    for (const etsUri of moduleEtsFiles) {
+      const uriKey = etsUri.toString();
+      moduleArkTsUris.set(uriKey, etsUri);
+      moduleArkTsTexts[uriKey] = await safeReadText(etsUri);
     }
 
     const analysis = analyzeStartupConfiguration({
@@ -588,9 +909,11 @@ async function analyzeWorkspaceFolder(
     const moduleDiagnostics: vscode.Diagnostic[] = [];
     const pagesDiagnostics: vscode.Diagnostic[] = [];
     const entryAbilityDiagnostics: vscode.Diagnostic[] = [];
+    const abilityDiagnostics = new Map<string, vscode.Diagnostic[]>();
     const pageDiagnostics = new Map<string, vscode.Diagnostic[]>();
     const routePageDiagnostics = new Map<string, vscode.Diagnostic[]>();
     const navUsageDiagnostics = new Map<string, vscode.Diagnostic[]>();
+    const arkTsDiagnostics = new Map<string, vscode.Diagnostic[]>();
 
     for (const issue of analysis.issues) {
       if (issue.target === 'module') {
@@ -616,6 +939,47 @@ async function analyzeWorkspaceFolder(
         }
         ensureDiagnosticEntry(pageDiagnostics, pageUri);
         pushDiagnosticToMap(pageDiagnostics, pageUri, createDiagnostic(pageText, issue));
+      }
+    }
+
+    const permissionIssues = analyzePermissionConfiguration({
+      moduleText,
+      abilityTexts,
+      stringResourceKeys,
+    });
+    for (const issue of permissionIssues) {
+      if (issue.target === 'module') {
+        moduleDiagnostics.push(createDiagnostic(moduleText, issue));
+        continue;
+      }
+
+      if (issue.target === 'ability' && issue.abilityName) {
+        const abilityUri = abilityUris.get(issue.abilityName);
+        const abilityText = abilityTexts[issue.abilityName];
+        if (!abilityUri || !abilityText) {
+          continue;
+        }
+        pushDiagnosticToMap(abilityDiagnostics, abilityUri, createDiagnostic(abilityText, issue));
+      }
+    }
+
+    const webViewIssues = analyzeWebViewDebuggingConfiguration({
+      moduleText,
+      arkTsTexts: moduleArkTsTexts,
+    });
+    for (const issue of webViewIssues) {
+      if (issue.target === 'module') {
+        moduleDiagnostics.push(createDiagnostic(moduleText, issue));
+        continue;
+      }
+
+      if (issue.target === 'arkts' && issue.documentKey) {
+        const arkTsUri = moduleArkTsUris.get(issue.documentKey);
+        const arkTsText = moduleArkTsTexts[issue.documentKey];
+        if (!arkTsUri || !arkTsText) {
+          continue;
+        }
+        pushDiagnosticToMap(arkTsDiagnostics, arkTsUri, createDiagnostic(arkTsText, issue));
       }
     }
 
@@ -699,13 +1063,8 @@ async function analyzeWorkspaceFolder(
         }
       }
 
-      const moduleEtsFiles = await vscode.workspace.findFiles(
-        new vscode.RelativePattern(vscode.Uri.file(moduleRoot), 'src/main/**/*.ets'),
-        '**/node_modules/**',
-      );
-
       for (const etsUri of moduleEtsFiles) {
-        const etsText = await safeReadText(etsUri);
+        const etsText = moduleArkTsTexts[etsUri.toString()];
         if (!etsText) {
           continue;
         }
@@ -739,6 +1098,12 @@ async function analyzeWorkspaceFolder(
       setDiagnosticsInSnapshot(snapshot, entryAbilityUri, entryAbilityDiagnostics);
     }
 
+    for (const [uriString, diagnostics] of abilityDiagnostics) {
+      const uri = vscode.Uri.parse(uriString);
+      const existing = snapshot.get(uri.toString()) ?? [];
+      setDiagnosticsInSnapshot(snapshot, uri, [...existing, ...diagnostics]);
+    }
+
     for (const route of analysis.routes) {
       const pageText = pageTexts[route];
       if (!pageText) {
@@ -760,9 +1125,14 @@ async function analyzeWorkspaceFolder(
       const existing = combinedPageDiagnostics.get(uriString) ?? [];
       combinedPageDiagnostics.set(uriString, [...existing, ...diagnostics]);
     }
-
     for (const [uriString, diagnostics] of combinedPageDiagnostics) {
       setDiagnosticsInSnapshot(snapshot, vscode.Uri.parse(uriString), diagnostics);
+    }
+
+    for (const [uriString, diagnostics] of arkTsDiagnostics) {
+      const uri = vscode.Uri.parse(uriString);
+      const existing = snapshot.get(uri.toString()) ?? [];
+      setDiagnosticsInSnapshot(snapshot, uri, [...existing, ...diagnostics]);
     }
   }
 

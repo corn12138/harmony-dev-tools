@@ -70,6 +70,15 @@ export const HARMONY_ACTIONS: HarmonyActionDefinition[] = [
     command: COMMANDS.UI_INSPECTOR,
   },
   {
+    id: 'webview-devtools',
+    section: 'Device',
+    label: 'Open WebView DevTools',
+    description: 'Prepare ArkWeb DevTools over USB',
+    tooltip: 'Discover the running WebView DevTools socket, forward it through HDC, and open Chrome inspect.',
+    icon: 'globe',
+    command: COMMANDS.OPEN_WEBVIEW_DEVTOOLS,
+  },
+  {
     id: 'view-logs',
     section: 'Device',
     label: 'Open Device Logs',

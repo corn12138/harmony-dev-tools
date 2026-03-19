@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Build, run, debug, inspect, and validate HarmonyOS apps directly in VS Code",
-  "version": "0.6.7",
+  "version": "0.6.8",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -151,6 +151,12 @@
         "command": "harmony.viewLogs",
         "title": "Open Device Logs (hilog)",
         "category": "HarmonyOS"
+      },
+      {
+        "command": "harmony.openWebViewDevTools",
+        "title": "Open WebView DevTools",
+        "category": "HarmonyOS",
+        "icon": "$(globe)"
       },
       {
         "command": "harmony.previewComponent",
@@ -387,6 +393,11 @@
         },
         {
           "command": "harmony.viewLogs",
+          "when": "view == harmony.deviceView && (viewItem == device-online || viewItem == emulator-running)",
+          "group": "navigation"
+        },
+        {
+          "command": "harmony.openWebViewDevTools",
           "when": "view == harmony.deviceView && (viewItem == device-online || viewItem == emulator-running)",
           "group": "navigation"
         },

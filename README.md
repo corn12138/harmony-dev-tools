@@ -6,25 +6,22 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
 > Core goal / 核心目标：hide HDC, hvigor, config migration, and device-targeting complexity behind a simpler VS Code workflow.
 > 把 HDC、hvigor、配置迁移、多设备选择这些复杂度收进插件里，让用户尽量只关心“选设备、点运行、看结果”。
 
-## What's New in v0.6.7 / v0.6.7 新变化
+## What's New in v0.6.8 / v0.6.8 新变化
 
-`v0.6.7` focuses on stability and lower-friction HarmonyOS workflows after a full plugin review.
-`v0.6.7` 重点是一次完整审查后的稳定性收口，把更多复杂度继续收进插件内部。
+`v0.6.8` focuses on hiding more WebView and permission-chain complexity inside the extension.
+`v0.6.8` 重点是把 WebView 调试和权限链路里的复杂度继续收进插件内部。
 
-- **Less diagnostic flicker / 更稳的工程诊断**
-  - project-config diagnostics now refresh per workspace snapshot instead of clearing the whole collection first
-  - 工程配置诊断现在按工作区快照刷新，不会先清空整组诊断再慢慢回填
-- **Smoother device status updates / 更稳的设备状态更新**
-  - device polling no longer stacks overlapping `hdc list targets` requests when HDC is slow
-  - HDC 慢响应时，设备状态栏不会再叠加轮询请求或把旧状态刷回来
-- **More accurate dark-mode guidance / 更准确的深色模式提示**
-  - `WithTheme({ colorMode: ... })` now recognizes both `dark.json` and `resources/dark/...` resources
-  - `WithTheme({ colorMode: ... })` 现在同时识别 `dark.json` 和 `resources/dark/...` 深色资源目录
-- **Parser stability fix / 底层解析稳定性修复**
-  - fixed an internal `WithTheme` parser loop that could hang diagnostics under specific inputs
-  - 修掉了一个 `WithTheme` 底层解析循环问题，避免特定输入下诊断卡死
+- **One-click ArkWeb DevTools / 一键 ArkWeb DevTools**
+  - use `Open WebView DevTools` from `Quick Actions`, the device tree, or the command palette
+  - 插件会自动检查 `setWebDebuggingAccess(true)`、检查 `INTERNET` 权限、发现 `webview_devtools_remote_*` socket、准备 USB `hdc fport`，然后直接打开 `chrome://inspect/#devices`
+- **WebView readiness diagnostics / WebView 就绪诊断**
+  - when a module uses `Web(...)` but misses `setWebDebuggingAccess(true)` or `ohos.permission.INTERNET`, the extension now tells you before you start debugging
+  - 当工程用了 `Web(...)` 却没开 `setWebDebuggingAccess(true)`，或者 `module.json5` 缺 `ohos.permission.INTERNET` 时，插件会先给出提示
+- **Permission chain checks / 权限链路检查**
+  - `module.json5 -> requestPermissions` and `requestPermissionsFromUser()` are now checked together
+  - `module.json5 -> requestPermissions` 和 `requestPermissionsFromUser()` 现在会联动检查，尽量把配置问题提前暴露
 
-## How to Use v0.6.7 / v0.6.7 怎么用
+## How to Use v0.6.8 / v0.6.8 怎么用
 
 ### Fastest workflow / 最快上手方式
 
@@ -34,13 +31,15 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
    先点 `Check SDK / HDC Environment`。
 3. Click the status-bar `HarmonyOS` button, or click the active-device button to choose a target.
    再点状态栏里的 `HarmonyOS` 按钮，或者点当前设备按钮来选目标设备。
-4. If you are building a themed page, type `withtheme` or `themecontrol`, or search `WithTheme` / `ThemeControl` in docs/completion.
+4. If your page contains `Web(...)`, click `Open WebView DevTools` from `Quick Actions` or the device tree.
+   如果页面里用了 `Web(...)`，直接在 `Quick Actions` 或设备树里点 `Open WebView DevTools`。
+5. If you are building a themed page, type `withtheme` or `themecontrol`, or search `WithTheme` / `ThemeControl` in docs/completion.
    如果你要做主题换肤页面，直接输入 `withtheme` 或 `themecontrol`，或者在补全/文档搜索里找 `WithTheme` / `ThemeControl`。
-5. If you switch local color mode, make sure the project has either `dark.json` or `resources/dark/...` resources.
+6. If you switch local color mode, make sure the project has either `dark.json` or `resources/dark/...` resources.
    如果你要切局部深浅色，记得工程里要有 `dark.json` 或 `resources/dark/...` 深色资源。
-6. Click `Build, Install & Run`.
+7. Click `Build, Install & Run`.
    然后点 `Build, Install & Run`。
-7. For device-specific work, right-click the device node in `Connected Devices`.
+8. For device-specific work, right-click the device node in `Connected Devices`.
    如果要看日志、镜像、截图、UI Inspector，就在 `Connected Devices` 里右键对应设备。
 
 ## Start Here / 先从这里开始

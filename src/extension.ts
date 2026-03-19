@@ -354,6 +354,11 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
     await viewLogs(commandArg);
   });
 
+  lazyCommand(COMMANDS.OPEN_WEBVIEW_DEVTOOLS, async (commandArg?: unknown) => {
+    const { openWebViewDevTools } = await import('./webview/devtools');
+    await openWebViewDevTools(commandArg);
+  });
+
   lazyCommand(COMMANDS.PREVIEW_COMPONENT, async () => {
     const { previewComponent } = await import('./preview/panel');
     await previewComponent();

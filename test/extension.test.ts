@@ -30,6 +30,7 @@ const cleanBuild = vi.fn(async () => undefined);
 const runOnDevice = vi.fn(async () => undefined);
 const installHap = vi.fn(async () => undefined);
 const viewLogs = vi.fn(async () => undefined);
+const openWebViewDevTools = vi.fn(async (_commandArg?: unknown) => undefined);
 const previewComponent = vi.fn(async () => undefined);
 const formatDocument = vi.fn(async () => undefined);
 const organizeImports = vi.fn(async () => undefined);
@@ -180,6 +181,10 @@ vi.mock('../src/device/manager', () => ({
 
 vi.mock('../src/device/logViewer', () => ({
   viewLogs,
+}));
+
+vi.mock('../src/webview/devtools', () => ({
+  openWebViewDevTools,
 }));
 
 vi.mock('../src/preview/panel', () => ({
@@ -334,6 +339,7 @@ describe('extension smoke', () => {
     await vscode.commands.executeCommand(COMMANDS.OPEN_CONTROL_CENTER);
     await vscode.commands.executeCommand(COMMANDS.UI_INSPECTOR, 'device-A');
     await vscode.commands.executeCommand(COMMANDS.DEVICE_MIRROR, 'device-B');
+    await vscode.commands.executeCommand(COMMANDS.OPEN_WEBVIEW_DEVTOOLS, 'device-W');
     await vscode.commands.executeCommand(COMMANDS.TAKE_SCREENSHOT, { id: 'device-D' });
     await vscode.commands.executeCommand(COMMANDS.CHECK_ENVIRONMENT);
     await vscode.commands.executeCommand(COMMANDS.VIEW_DEVICES);
@@ -345,6 +351,7 @@ describe('extension smoke', () => {
     expect(buildAndRun).toHaveBeenCalledTimes(2);
     expect(openUIInspector).toHaveBeenCalledWith('device-A');
     expect(openDeviceMirror).toHaveBeenCalledWith('device-B');
+    expect(openWebViewDevTools).toHaveBeenCalledWith('device-W');
     expect(takeDeviceScreenshot).toHaveBeenCalledWith({ id: 'device-D' });
     expect(checkEnvironment).toHaveBeenCalledTimes(1);
     expect(deviceTreeRefresh).toHaveBeenCalledTimes(1);

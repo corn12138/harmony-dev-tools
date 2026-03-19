@@ -51,6 +51,21 @@ const CURRENT_ARKUI_SHORTCUTS: DocItem[] = [
     docUrl: 'https://gitee.com/openharmony/docs/blob/14c2fb4ddf051bda012f7c0fbfad196192d8c934/zh-cn/application-dev/reference/apis-arkui/js-apis-arkui-theme.md',
   },
   {
+    label: 'Permissions / requestPermissions 权限链路',
+    detail: '官方权限申请指南：module.json5 requestPermissions、requestPermissionsFromUser、动态授权',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/8fb24e414c42d485a94305e541799d9d416fd4a7/en/application-dev/security/accesstoken-guidelines.md',
+  },
+  {
+    label: 'module.json5 / requestPermissions 配置',
+    detail: '官方 module.json5 文档：abilities、requestPermissions、querySchemes、routerMap 等配置总览',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/5f3bd0ff81cfd09c9a059b7f9f6cfe452b3b01a9/zh-cn/application-dev/quick-start/module-configuration-file.md',
+  },
+  {
+    label: 'WebView DevTools / ArkWeb 前端调试',
+    detail: '官方 WebView DevTools 指南：setWebDebuggingAccess、USB fport、API 20+ 无线调试',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/web/web-debugging-with-devtools.md',
+  },
+  {
     label: 'State Management V2 Overview / 状态管理 V2 概览',
     detail: '官方对 V1/V2 差异、兼容关系、withTheme API 16 支持等的最新说明',
     docUrl: 'https://gitee.com/openharmony/docs/blob/2625097b75653e461804aafe08ffc780c69d9f91/zh-cn/application-dev/quick-start/arkts-state-management-overview.md',

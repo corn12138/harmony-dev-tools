@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   PROJECT_CONFIG_DIAG_CODES,
   PROJECT_CONFIG_DIAG_SOURCE,
@@ -56,6 +58,21 @@ class ProjectConfigCodeActionProvider implements vscode.CodeActionProvider {
           }
           break;
         }
+        case PROJECT_CONFIG_DIAG_CODES.PERMISSION_RUNTIME_UNDECLARED:
+        case PROJECT_CONFIG_DIAG_CODES.PERMISSION_RUNTIME_REASON_MISSING:
+        case PROJECT_CONFIG_DIAG_CODES.PERMISSION_RUNTIME_ABILITY_MISMATCH: {
+          const action = this.createOpenOwningModuleJsonAction(document.uri, diagnostic);
+          if (action) {
+            actions.push(action);
+          }
+          break;
+        }
+        case PROJECT_CONFIG_DIAG_CODES.WEBVIEW_DEBUG_ACCESS_MISSING:
+          actions.push(this.createOpenDocsAction('查看 WebView DevTools 官方指南', 'WebView DevTools', diagnostic));
+          break;
+        case PROJECT_CONFIG_DIAG_CODES.WEBVIEW_INTERNET_PERMISSION_MISSING:
+          actions.push(this.createOpenDocsAction('查看 WebView DevTools / INTERNET 权限说明', 'WebView DevTools', diagnostic));
+          break;
         default:
           break;
       }
@@ -151,5 +168,59 @@ class ProjectConfigCodeActionProvider implements vscode.CodeActionProvider {
       title: 'Save app.json5',
     };
     return action;
+  }
+
+  private createOpenOwningModuleJsonAction(
+    documentUri: vscode.Uri,
+    diagnostic: vscode.Diagnostic,
+  ): vscode.CodeAction | undefined {
+    const moduleJsonUri = findOwningModuleJsonUri(documentUri);
+    if (!moduleJsonUri) {
+      return undefined;
+    }
+
+    const action = new vscode.CodeAction(
+      '打开 module.json5 补权限声明',
+      vscode.CodeActionKind.QuickFix,
+    );
+    action.command = {
+      command: 'vscode.open',
+      title: 'Open module.json5',
+      arguments: [moduleJsonUri],
+    };
+    action.diagnostics = [diagnostic];
+    return action;
+  }
+
+  private createOpenDocsAction(
+    title: string,
+    prefill: string,
+    diagnostic: vscode.Diagnostic,
+  ): vscode.CodeAction {
+    const action = new vscode.CodeAction(title, vscode.CodeActionKind.QuickFix);
+    action.command = {
+      command: COMMANDS.OPEN_DOCS,
+      title,
+      arguments: [prefill],
+    };
+    action.diagnostics = [diagnostic];
+    return action;
+  }
+}
+
+function findOwningModuleJsonUri(documentUri: vscode.Uri): vscode.Uri | undefined {
+  let currentDir = path.dirname(documentUri.fsPath);
+
+  while (true) {
+    const candidate = path.join(currentDir, 'module.json5');
+    if (fs.existsSync(candidate)) {
+      return vscode.Uri.file(candidate);
+    }
+
+    const parentDir = path.dirname(currentDir);
+    if (parentDir === currentDir) {
+      return undefined;
+    }
+    currentDir = parentDir;
   }
 }
