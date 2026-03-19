@@ -6,22 +6,24 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
 > Core goal / 核心目标：hide HDC, hvigor, config migration, and device-targeting complexity behind a simpler VS Code workflow.
 > 把 HDC、hvigor、配置迁移、多设备选择这些复杂度收进插件里，让用户尽量只关心“选设备、点运行、看结果”。
 
-## What's New in v0.6.8 / v0.6.8 新变化
+## What's New in v0.6.9 / v0.6.9 新变化
 
-`v0.6.8` focuses on hiding more WebView and permission-chain complexity inside the extension.
-`v0.6.8` 重点是把 WebView 调试和权限链路里的复杂度继续收进插件内部。
+`v0.6.9` continues to reduce WebView debugging setup work, especially for API 20+ wireless ArkWeb debugging.
+`v0.6.9` 继续把 WebView 调试准备工作收进插件内部，重点补齐了 API 20+ 无线 ArkWeb 调试。
 
-- **One-click ArkWeb DevTools / 一键 ArkWeb DevTools**
-  - use `Open WebView DevTools` from `Quick Actions`, the device tree, or the command palette
-  - 插件会自动检查 `setWebDebuggingAccess(true)`、检查 `INTERNET` 权限、发现 `webview_devtools_remote_*` socket、准备 USB `hdc fport`，然后直接打开 `chrome://inspect/#devices`
-- **WebView readiness diagnostics / WebView 就绪诊断**
-  - when a module uses `Web(...)` but misses `setWebDebuggingAccess(true)` or `ohos.permission.INTERNET`, the extension now tells you before you start debugging
-  - 当工程用了 `Web(...)` 却没开 `setWebDebuggingAccess(true)`，或者 `module.json5` 缺 `ohos.permission.INTERNET` 时，插件会先给出提示
-- **Permission chain checks / 权限链路检查**
-  - `module.json5 -> requestPermissions` and `requestPermissionsFromUser()` are now checked together
-  - `module.json5 -> requestPermissions` 和 `requestPermissionsFromUser()` 现在会联动检查，尽量把配置问题提前暴露
+- **Smarter wireless ArkWeb DevTools / 更聪明的无线 ArkWeb DevTools**
+  - when the project uses `setWebDebuggingAccess(true, port)`, the extension now probes device IPv4 addresses over HDC
+  - 如果工程用了 `setWebDebuggingAccess(true, port)`，插件现在会通过 HDC 探测设备 IPv4 地址
+  - it prefers the address that matches the developer machine subnet and tells the user the exact `device-ip:port` target
+  - 会优先选和开发机同网段的地址，并直接告诉用户精确的 `device-ip:port`
+- **Fewer manual steps / 更少手工步骤**
+  - wireless WebView DevTools now opens `chrome://inspect/#devices` immediately, matching the USB flow more closely
+  - 无线 WebView DevTools 现在也会直接打开 `chrome://inspect/#devices`，和 USB 一键流更一致
+- **Stronger boundary coverage / 更强的边界覆盖**
+  - added parser coverage for device IPv4 discovery from `ip addr` / `ifconfig` outputs and subnet-based target selection
+  - 新增了 `ip addr` / `ifconfig` 输出解析，以及按子网选择调试目标的测试覆盖
 
-## How to Use v0.6.8 / v0.6.8 怎么用
+## How to Use v0.6.9 / v0.6.9 怎么用
 
 ### Fastest workflow / 最快上手方式
 
@@ -33,13 +35,15 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
    再点状态栏里的 `HarmonyOS` 按钮，或者点当前设备按钮来选目标设备。
 4. If your page contains `Web(...)`, click `Open WebView DevTools` from `Quick Actions` or the device tree.
    如果页面里用了 `Web(...)`，直接在 `Quick Actions` 或设备树里点 `Open WebView DevTools`。
-5. If you are building a themed page, type `withtheme` or `themecontrol`, or search `WithTheme` / `ThemeControl` in docs/completion.
+5. For API 20+ wireless debugging, the extension will try to detect the device IP automatically and open `chrome://inspect/#devices` for you.
+   对 API 20+ 无线调试，插件会尽量自动探测设备 IP，并直接帮你打开 `chrome://inspect/#devices`。
+6. If you are building a themed page, type `withtheme` or `themecontrol`, or search `WithTheme` / `ThemeControl` in docs/completion.
    如果你要做主题换肤页面，直接输入 `withtheme` 或 `themecontrol`，或者在补全/文档搜索里找 `WithTheme` / `ThemeControl`。
-6. If you switch local color mode, make sure the project has either `dark.json` or `resources/dark/...` resources.
+7. If you switch local color mode, make sure the project has either `dark.json` or `resources/dark/...` resources.
    如果你要切局部深浅色，记得工程里要有 `dark.json` 或 `resources/dark/...` 深色资源。
-7. Click `Build, Install & Run`.
+8. Click `Build, Install & Run`.
    然后点 `Build, Install & Run`。
-8. For device-specific work, right-click the device node in `Connected Devices`.
+9. For device-specific work, right-click the device node in `Connected Devices`.
    如果要看日志、镜像、截图、UI Inspector，就在 `Connected Devices` 里右键对应设备。
 
 ## Start Here / 先从这里开始

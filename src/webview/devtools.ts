@@ -4,6 +4,7 @@ import { ensureConnectedDevice } from '../device/devices';
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { parseRequestPermissionEntries } from '../project/projectConfigDiagnostics';
+import { listHostIpv4Addresses, parseDeviceIpv4Addresses, pickPreferredDeviceIpv4 } from './network';
 import { hasWebViewUsage, parseWebDebuggingAccess, type WebDebuggingAccessConfig } from './projectAnalysis';
 
 const WEBVIEW_DEVTOOLS_DOC_URL = 'https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/web/web-debugging-with-devtools.md';
@@ -36,7 +37,7 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
   }
 
   if (projectState?.debugAccess?.port) {
-    await handleWirelessWebViewDebugging(projectState.debugAccess.port, projectState.moduleJsonUri);
+    await handleWirelessWebViewDebugging(device.id, projectState.debugAccess.port, projectState.moduleJsonUri);
     return;
   }
 
@@ -277,24 +278,67 @@ async function explainMissingWebViewSocket(projectState?: WebViewDebugProjectSta
   }
 }
 
-async function handleWirelessWebViewDebugging(port: number, moduleJsonUri?: vscode.Uri): Promise<void> {
-  const actions = ['Open Chrome Inspect', 'Open WebView Docs'];
+async function handleWirelessWebViewDebugging(
+  deviceId: string,
+  port: number,
+  moduleJsonUri?: vscode.Uri,
+): Promise<void> {
+  const selectedAddress = await selectWirelessDebugAddress(deviceId);
+  const target = selectedAddress ? `${selectedAddress.address}:${port}` : `<device-ip>:${port}`;
+  const actions = [`Copy ${target}`, 'Open Chrome Inspect', 'Open WebView Docs'];
   if (moduleJsonUri) {
     actions.unshift('Open module.json5');
   }
 
+  await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
+
   const action = await vscode.window.showInformationMessage(
-    `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add <device-ip>:${port}.`,
+    selectedAddress
+      ? `Detected API 20+ wireless WebView debugging on ${target}. Chrome inspect has been opened; if needed, add ${target} under “Discover network targets”.`
+      : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add <device-ip>:${port}.`,
     ...actions,
   );
 
-  if (action === 'Open Chrome Inspect') {
+  if (action === `Copy ${target}`) {
+    await vscode.env.clipboard.writeText(target);
+  } else if (action === 'Open Chrome Inspect') {
     await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
   } else if (action === 'Open WebView Docs') {
     await vscode.env.openExternal(vscode.Uri.parse(WEBVIEW_DEVTOOLS_DOC_URL));
   } else if (action === 'Open module.json5' && moduleJsonUri) {
     await vscode.commands.executeCommand('vscode.open', moduleJsonUri);
   }
+}
+
+async function selectWirelessDebugAddress(deviceId: string): Promise<{ address: string } | undefined> {
+  const candidates = await discoverDeviceIpv4Addresses(deviceId);
+  if (candidates.length === 0) {
+    return undefined;
+  }
+
+  return pickPreferredDeviceIpv4(candidates, listHostIpv4Addresses()) ?? candidates[0];
+}
+
+async function discoverDeviceIpv4Addresses(deviceId: string) {
+  const targetArgs = buildHdcTargetArgs(deviceId);
+  const commands = [
+    'ip -o -4 addr show',
+    'ifconfig',
+  ];
+
+  for (const shellCommand of commands) {
+    try {
+      const { stdout } = await execHdc([...targetArgs, 'shell', shellCommand], { timeout: 5000 });
+      const addresses = parseDeviceIpv4Addresses(stdout);
+      if (addresses.length > 0) {
+        return addresses;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return [];
 }
 
 async function safeReadText(uri: vscode.Uri): Promise<string | undefined> {

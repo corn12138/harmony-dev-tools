@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-03-19
+- Improved API 20+ wireless ArkWeb DevTools guidance by probing device IPv4 addresses over HDC, preferring the address that matches the developer machine subnet, and surfacing the exact `device-ip:port` target to add in Chrome inspect.
+- Wireless WebView DevTools now opens `chrome://inspect/#devices` immediately, so the user flow matches the USB one-click workflow more closely.
+- Added direct parser tests for device IPv4 discovery from common `ip addr` / `ifconfig` outputs, plus host-subnet matching coverage for the wireless debug target picker.
+
 ## [0.6.8] - 2026-03-19
 - Added project-level permission diagnostics that align `module.json5 -> requestPermissions` with `requestPermissionsFromUser()` calls in Ability files, including undeclared permissions, missing `reason`, and `usedScene.abilities` mismatches.
 - Added warnings for duplicate `requestPermissions` entries, unknown `usedScene.abilities` references, and missing `$string:` resources used by permission `reason`.
