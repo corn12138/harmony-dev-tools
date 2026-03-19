@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.7] - 2026-03-19
+- Reduced project-config diagnostic flicker by replacing `collection.clear()` refreshes with per-workspace snapshots, and by refreshing only the affected workspace folder for document-driven updates.
+- Prevented overlapping HDC status-bar polls from piling up when `hdc list targets` is slow, so the active-device indicator no longer races stale results back onto the UI.
+- Expanded `WithTheme({ colorMode: ... })` dark-mode resource checks to recognize both `dark.json` and `resources/dark/...` qualifier directories, matching the official dark/light adaptation docs more closely.
+- Fixed an infinite-loop bug in the `WithTheme` color-mode parser caused by a non-global regex `exec` loop, and added direct parser regression tests.
+
 ## [0.6.6] - 2026-03-19
 - Added theme-related guidance for `ThemeControl.setDefaultTheme` and `onWillApplyTheme`, including docs shortcuts, snippets, and V2 compatibility warnings below API 16.
 - Added a focused diagnostic when `ThemeControl.setDefaultTheme()` is called inside `build()`, with a quick link back to the official ThemeControl docs.

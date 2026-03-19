@@ -32,6 +32,9 @@ interface DeviceStatusBarState {
 let activeDeviceId: string | undefined;
 let deviceStatusBarItem: vscode.StatusBarItem | undefined;
 let deviceStatusBarTimer: ReturnType<typeof setInterval> | undefined;
+let deviceStatusBarRequestVersion = 0;
+let deviceStatusBarAppliedVersion = 0;
+let deviceStatusBarRefreshPromise: Promise<void> | undefined;
 
 export async function listConnectedDevices(): Promise<ConnectedDevice[]> {
   const { devices } = await getConnectedDeviceState();
@@ -114,7 +117,7 @@ export function getActiveDeviceId(): string | undefined {
 
 export function setActiveDeviceId(deviceId?: string): void {
   activeDeviceId = deviceId;
-  updateDeviceStatusBar().catch(() => undefined);
+  requestDeviceStatusBarRefresh();
 }
 
 export function chooseAutoDevice(
@@ -191,10 +194,10 @@ export function createDeviceStatusBar(context: vscode.ExtensionContext): vscode.
 
   const interval = vscode.workspace.getConfiguration('harmony').get<number>('devicePollInterval', 5000);
   deviceStatusBarTimer = setInterval(() => {
-    void updateDeviceStatusBar();
+    requestDeviceStatusBarRefresh();
   }, interval);
 
-  void updateDeviceStatusBar();
+  requestDeviceStatusBarRefresh();
 
   const configWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
     if (!event.affectsConfiguration('harmony.devicePollInterval')) {
@@ -207,7 +210,7 @@ export function createDeviceStatusBar(context: vscode.ExtensionContext): vscode.
 
     const nextInterval = vscode.workspace.getConfiguration('harmony').get<number>('devicePollInterval', 5000);
     deviceStatusBarTimer = setInterval(() => {
-      void updateDeviceStatusBar();
+      requestDeviceStatusBarRefresh();
     }, nextInterval);
   });
 
@@ -215,7 +218,7 @@ export function createDeviceStatusBar(context: vscode.ExtensionContext): vscode.
     deviceStatusBarItem,
     configWatcher,
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      void updateDeviceStatusBar();
+      requestDeviceStatusBarRefresh();
     }),
     {
       dispose: () => {
@@ -223,6 +226,7 @@ export function createDeviceStatusBar(context: vscode.ExtensionContext): vscode.
           clearInterval(deviceStatusBarTimer);
           deviceStatusBarTimer = undefined;
         }
+        deviceStatusBarRefreshPromise = undefined;
       },
     },
   );
@@ -286,6 +290,41 @@ async function updateDeviceStatusBar(): Promise<void> {
   }
 
   const state = await getConnectedDeviceState();
+  await applyDeviceStatusBarState(state);
+}
+
+function requestDeviceStatusBarRefresh(): void {
+  deviceStatusBarRequestVersion += 1;
+  if (deviceStatusBarRefreshPromise) {
+    return;
+  }
+
+  deviceStatusBarRefreshPromise = flushDeviceStatusBarRefresh().finally(() => {
+    deviceStatusBarRefreshPromise = undefined;
+    if (deviceStatusBarAppliedVersion !== deviceStatusBarRequestVersion) {
+      requestDeviceStatusBarRefresh();
+    }
+  });
+}
+
+async function flushDeviceStatusBarRefresh(): Promise<void> {
+  while (deviceStatusBarAppliedVersion !== deviceStatusBarRequestVersion) {
+    const version = deviceStatusBarRequestVersion;
+    const state = await getConnectedDeviceState();
+    if (version !== deviceStatusBarRequestVersion) {
+      continue;
+    }
+
+    await applyDeviceStatusBarState(state);
+    deviceStatusBarAppliedVersion = version;
+  }
+}
+
+async function applyDeviceStatusBarState(state: DeviceDiscoveryState): Promise<void> {
+  if (!deviceStatusBarItem) {
+    return;
+  }
+
   if (state.error) {
     activeDeviceId = undefined;
     const status = getDeviceStatusBarState(state);

@@ -33,6 +33,12 @@ interface AnalyzeContext {
 
 const SOURCE = 'HarmonyOS';
 
+export function isDarkThemeResourcePath(fsPath: string): boolean {
+  const normalized = fsPath.replace(/\\/g, '/');
+  return /\/resources\/(?:.*\/)?dark\.json$/i.test(normalized)
+    || /\/resources\/(?:.*\/)?dark(?:\/|$)/i.test(normalized);
+}
+
 // ---------------------------------------------------------------------------
 // V1 / V2 decorator sets
 // ---------------------------------------------------------------------------
@@ -75,6 +81,7 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
   let cachedApiLevel: number | undefined;
   const darkThemeResourceCache = new Map<string, boolean>();
   const runVersions = new Map<string, number>();
+  const darkThemeWatchers: vscode.FileSystemWatcher[] = [];
 
   const detectProjectApi = async () => {
     const rootUri = getPreferredWorkspaceFolder()?.uri;
@@ -99,12 +106,19 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
       return cached;
     }
 
-    const matches = await vscode.workspace.findFiles(
-      new vscode.RelativePattern(folder, '**/resources/**/dark.json'),
-      '**/node_modules/**',
-      20,
-    );
-    const result = matches.length > 0;
+    const [darkJsonMatches, darkQualifierMatches] = await Promise.all([
+      vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, '**/resources/**/dark.json'),
+        '**/node_modules/**',
+        20,
+      ),
+      vscode.workspace.findFiles(
+        new vscode.RelativePattern(folder, '**/resources/**/dark/**'),
+        '**/node_modules/**',
+        20,
+      ),
+    ]);
+    const result = [...darkJsonMatches, ...darkQualifierMatches].some((uri) => isDarkThemeResourcePath(uri.fsPath));
     darkThemeResourceCache.set(key, result);
     return result;
   };
@@ -140,22 +154,25 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
     }
   });
 
-  const darkThemeWatcher = vscode.workspace.createFileSystemWatcher('**/resources/**/dark.json');
   const invalidateDarkThemeCache = () => {
     darkThemeResourceCache.clear();
     if (vscode.window.activeTextEditor) {
-      runDiag(vscode.window.activeTextEditor.document);
+      void runDiag(vscode.window.activeTextEditor.document);
     }
   };
-  darkThemeWatcher.onDidCreate(invalidateDarkThemeCache);
-  darkThemeWatcher.onDidChange(invalidateDarkThemeCache);
-  darkThemeWatcher.onDidDelete(invalidateDarkThemeCache);
-
-  if (vscode.window.activeTextEditor) {
-    runDiag(vscode.window.activeTextEditor.document);
+  for (const pattern of ['**/resources/**/dark.json', '**/resources/**/dark/**']) {
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+    watcher.onDidCreate(invalidateDarkThemeCache);
+    watcher.onDidChange(invalidateDarkThemeCache);
+    watcher.onDidDelete(invalidateDarkThemeCache);
+    darkThemeWatchers.push(watcher);
   }
 
-  const disposable = vscode.Disposable.from(collection, onOpen, onSave, onChange, onConfigChange, darkThemeWatcher);
+  if (vscode.window.activeTextEditor) {
+    void runDiag(vscode.window.activeTextEditor.document);
+  }
+
+  const disposable = vscode.Disposable.from(collection, onOpen, onSave, onChange, onConfigChange, ...darkThemeWatchers);
   context.subscriptions.push(disposable);
   return disposable;
 }
@@ -397,7 +414,7 @@ function checkWithThemeDarkResources(text: string, context: AnalyzeContext): Raw
     line: usage.line,
     colStart: usage.colStart,
     colEnd: usage.colEnd,
-    message: '检测到 WithTheme({ colorMode: ... })，但当前工程还没有 dark.json 资源文件。根据官方文档，缺少 dark.json 时局部深浅色模式不会生效。',
+    message: '检测到 WithTheme({ colorMode: ... })，但当前工程还没有深色模式资源。根据官方文档，请补充 dark.json 或 resources/dark/... 目录下的深色资源文件，否则局部深浅色模式不会生效。',
     severity: vscode.DiagnosticSeverity.Warning,
     code: DIAG_CODES.WITH_THEME_DARK_RESOURCE,
   }));

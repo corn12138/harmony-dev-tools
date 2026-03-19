@@ -470,17 +470,6 @@ function isConfigDocument(document: vscode.TextDocument): boolean {
     || document.fileName.endsWith('route_map.json');
 }
 
-function setDiagnosticsIfFresh(
-  collection: vscode.DiagnosticCollection,
-  uri: vscode.Uri,
-  diagnostics: vscode.Diagnostic[],
-  isFresh: () => boolean,
-): void {
-  if (isFresh()) {
-    collection.set(uri, diagnostics);
-  }
-}
-
 function pushDiagnosticToMap(
   map: Map<string, vscode.Diagnostic[]>,
   uri: vscode.Uri,
@@ -491,16 +480,53 @@ function pushDiagnosticToMap(
   map.set(uri.toString(), existing);
 }
 
+function ensureDiagnosticEntry(
+  map: Map<string, vscode.Diagnostic[]>,
+  uri: vscode.Uri,
+): void {
+  if (!map.has(uri.toString())) {
+    map.set(uri.toString(), []);
+  }
+}
+
+function setDiagnosticsInSnapshot(
+  snapshot: Map<string, vscode.Diagnostic[]>,
+  uri: vscode.Uri,
+  diagnostics: vscode.Diagnostic[],
+): void {
+  snapshot.set(uri.toString(), diagnostics);
+}
+
+function applyWorkspaceSnapshot(
+  collection: vscode.DiagnosticCollection,
+  previousUris: Set<string>,
+  snapshot: Map<string, vscode.Diagnostic[]>,
+): Set<string> {
+  const nextUris = new Set(snapshot.keys());
+
+  for (const uriString of previousUris) {
+    if (!nextUris.has(uriString)) {
+      collection.delete(vscode.Uri.parse(uriString));
+    }
+  }
+
+  for (const [uriString, diagnostics] of snapshot) {
+    collection.set(vscode.Uri.parse(uriString), diagnostics);
+  }
+
+  return nextUris;
+}
+
 async function analyzeWorkspaceFolder(
   folder: vscode.WorkspaceFolder,
-  collection: vscode.DiagnosticCollection,
   isFresh: () => boolean,
-): Promise<void> {
+): Promise<Map<string, vscode.Diagnostic[]> | undefined> {
+  const snapshot = new Map<string, vscode.Diagnostic[]>();
   const buildProfileUri = vscode.Uri.joinPath(folder.uri, 'build-profile.json5');
   const buildProfileText = await safeReadText(buildProfileUri);
   if (buildProfileText) {
     const diagnostics = analyzeBuildProfileDiagnostics(buildProfileText).map((issue) => createDiagnostic(buildProfileText, issue));
-    setDiagnosticsIfFresh(collection, buildProfileUri, diagnostics, isFresh);
+    setDiagnosticsInSnapshot(snapshot, buildProfileUri, diagnostics);
   }
 
   const appJsonUri = vscode.Uri.joinPath(folder.uri, 'AppScope', 'app.json5');
@@ -510,7 +536,7 @@ async function analyzeWorkspaceFolder(
     const appBundleName = extractJson5StringValue(appJsonText, 'bundleName');
     const diagnostics = analyzeSigningBundleNameDiagnostics(appBundleName, signingInfo?.bundleName)
       .map((issue) => createDiagnostic(appJsonText, issue));
-    setDiagnosticsIfFresh(collection, appJsonUri, diagnostics, isFresh);
+    setDiagnosticsInSnapshot(snapshot, appJsonUri, diagnostics);
   }
 
   const moduleFiles = await vscode.workspace.findFiles(
@@ -520,7 +546,7 @@ async function analyzeWorkspaceFolder(
 
   for (const moduleUri of moduleFiles) {
     if (!isFresh()) {
-      return;
+      return undefined;
     }
 
     const moduleText = await safeReadText(moduleUri);
@@ -588,6 +614,7 @@ async function analyzeWorkspaceFolder(
         if (!pageText) {
           continue;
         }
+        ensureDiagnosticEntry(pageDiagnostics, pageUri);
         pushDiagnosticToMap(pageDiagnostics, pageUri, createDiagnostic(pageText, issue));
       }
     }
@@ -651,6 +678,7 @@ async function analyzeWorkspaceFolder(
           continue;
         }
 
+        ensureDiagnosticEntry(routePageDiagnostics, routePageUri);
         const builderState = inspectBuilderFunction(routePageText, entry.buildFunction);
         if (builderState === 'missingFunction') {
           routeMapDiagnostics.push(createDiagnostic(routeMapText, {
@@ -682,6 +710,7 @@ async function analyzeWorkspaceFolder(
           continue;
         }
 
+        ensureDiagnosticEntry(navUsageDiagnostics, etsUri);
         for (const usage of extractNavigationRouteUsages(etsText)) {
           if (routeNames.has(usage.routeName)) {
             continue;
@@ -697,43 +726,65 @@ async function analyzeWorkspaceFolder(
         }
       }
 
-      setDiagnosticsIfFresh(collection, routeMapUri, routeMapDiagnostics, isFresh);
+      setDiagnosticsInSnapshot(snapshot, routeMapUri, routeMapDiagnostics);
     }
 
-    setDiagnosticsIfFresh(collection, moduleUri, moduleDiagnostics, isFresh);
+    setDiagnosticsInSnapshot(snapshot, moduleUri, moduleDiagnostics);
 
     if (pagesUri && pagesText) {
-      setDiagnosticsIfFresh(collection, pagesUri, pagesDiagnostics, isFresh);
+      setDiagnosticsInSnapshot(snapshot, pagesUri, pagesDiagnostics);
     }
 
     if (entryAbilityUri && entryAbilityText) {
-      setDiagnosticsIfFresh(collection, entryAbilityUri, entryAbilityDiagnostics, isFresh);
+      setDiagnosticsInSnapshot(snapshot, entryAbilityUri, entryAbilityDiagnostics);
     }
 
+    for (const route of analysis.routes) {
+      const pageText = pageTexts[route];
+      if (!pageText) {
+        continue;
+      }
+      const pageUri = vscode.Uri.file(path.join(moduleRoot, 'src', 'main', 'ets', `${route}.ets`));
+      ensureDiagnosticEntry(pageDiagnostics, pageUri);
+    }
+
+    const combinedPageDiagnostics = new Map<string, vscode.Diagnostic[]>();
     for (const [uriString, diagnostics] of pageDiagnostics) {
-      setDiagnosticsIfFresh(collection, vscode.Uri.parse(uriString), diagnostics, isFresh);
+      combinedPageDiagnostics.set(uriString, [...diagnostics]);
     }
-
-    for (const [uriString, diagnostics] of routePageDiagnostics) {
-      const uri = vscode.Uri.parse(uriString);
-      const existing = collection.get(uri) ?? [];
-      setDiagnosticsIfFresh(collection, uri, [...existing, ...diagnostics], isFresh);
-    }
-
     for (const [uriString, diagnostics] of navUsageDiagnostics) {
-      const uri = vscode.Uri.parse(uriString);
-      const existing = collection.get(uri) ?? [];
-      setDiagnosticsIfFresh(collection, uri, [...existing, ...diagnostics], isFresh);
+      const existing = combinedPageDiagnostics.get(uriString) ?? [];
+      combinedPageDiagnostics.set(uriString, [...existing, ...diagnostics]);
+    }
+    for (const [uriString, diagnostics] of routePageDiagnostics) {
+      const existing = combinedPageDiagnostics.get(uriString) ?? [];
+      combinedPageDiagnostics.set(uriString, [...existing, ...diagnostics]);
+    }
+
+    for (const [uriString, diagnostics] of combinedPageDiagnostics) {
+      setDiagnosticsInSnapshot(snapshot, vscode.Uri.parse(uriString), diagnostics);
     }
   }
+
+  return snapshot;
 }
 
 export function createProjectConfigDiagnosticProvider(context: vscode.ExtensionContext): vscode.Disposable {
   const collection = vscode.languages.createDiagnosticCollection('harmony-project-config');
   let timer: NodeJS.Timeout | undefined;
   let refreshVersion = 0;
+  const managedWorkspaceUris = new Map<string, Set<string>>();
+  let refreshAll = false;
+  const pendingFolderKeys = new Set<string>();
 
-  const refresh = () => {
+  const refresh = (folder?: vscode.WorkspaceFolder) => {
+    if (!folder) {
+      refreshAll = true;
+      pendingFolderKeys.clear();
+    } else if (!refreshAll) {
+      pendingFolderKeys.add(folder.uri.toString());
+    }
+
     if (timer) {
       clearTimeout(timer);
     }
@@ -741,9 +792,52 @@ export function createProjectConfigDiagnosticProvider(context: vscode.ExtensionC
     timer = setTimeout(async () => {
       const currentVersion = ++refreshVersion;
       const isFresh = () => currentVersion === refreshVersion;
-      collection.clear();
-      const folders = vscode.workspace.workspaceFolders ?? [];
-      await Promise.all(folders.map((folder) => analyzeWorkspaceFolder(folder, collection, isFresh)));
+      const allFolders = vscode.workspace.workspaceFolders ?? [];
+      const folders = refreshAll
+        ? allFolders
+        : allFolders.filter((item) => pendingFolderKeys.has(item.uri.toString()));
+
+      refreshAll = false;
+      pendingFolderKeys.clear();
+
+      const snapshots = await Promise.all(
+        folders.map(async (workspaceFolder) => ({
+          folderKey: workspaceFolder.uri.toString(),
+          snapshot: await analyzeWorkspaceFolder(workspaceFolder, isFresh),
+        })),
+      );
+
+      if (!isFresh()) {
+        return;
+      }
+
+      if (folders.length === 0) {
+        collection.clear();
+        managedWorkspaceUris.clear();
+        return;
+      }
+
+      if (allFolders.length === folders.length) {
+        const liveFolderKeys = new Set(allFolders.map((item) => item.uri.toString()));
+        for (const [folderKey, uris] of managedWorkspaceUris) {
+          if (liveFolderKeys.has(folderKey)) {
+            continue;
+          }
+          for (const uriString of uris) {
+            collection.delete(vscode.Uri.parse(uriString));
+          }
+          managedWorkspaceUris.delete(folderKey);
+        }
+      }
+
+      for (const entry of snapshots) {
+        if (!entry.snapshot) {
+          return;
+        }
+        const previousUris = managedWorkspaceUris.get(entry.folderKey) ?? new Set<string>();
+        const nextUris = applyWorkspaceSnapshot(collection, previousUris, entry.snapshot);
+        managedWorkspaceUris.set(entry.folderKey, nextUris);
+      }
     }, 250);
   };
 
@@ -751,17 +845,17 @@ export function createProjectConfigDiagnosticProvider(context: vscode.ExtensionC
 
   const onOpen = vscode.workspace.onDidOpenTextDocument((document) => {
     if (isConfigDocument(document)) {
-      refresh();
+      refresh(vscode.workspace.getWorkspaceFolder(document.uri));
     }
   });
   const onSave = vscode.workspace.onDidSaveTextDocument((document) => {
     if (isRelevantDocument(document)) {
-      refresh();
+      refresh(vscode.workspace.getWorkspaceFolder(document.uri));
     }
   });
   const onChange = vscode.workspace.onDidChangeTextDocument((event) => {
     if (isConfigDocument(event.document)) {
-      refresh();
+      refresh(vscode.workspace.getWorkspaceFolder(event.document.uri));
     }
   });
   const onFolders = vscode.workspace.onDidChangeWorkspaceFolders(() => refresh());

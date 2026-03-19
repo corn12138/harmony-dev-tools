@@ -89,9 +89,13 @@ function extractCallArgumentBlocks(
   label: string,
 ): Array<{ usage: WithThemeUsage; args: string }> {
   const blocks: Array<{ usage: WithThemeUsage; args: string }> = [];
+  const globalPattern = new RegExp(
+    pattern.source,
+    pattern.flags.includes('g') ? pattern.flags : `${pattern.flags}g`,
+  );
   let match: RegExpExecArray | null;
 
-  while ((match = pattern.exec(text)) !== null) {
+  while ((match = globalPattern.exec(text)) !== null) {
     if (match.index === undefined) {
       continue;
     }
@@ -116,7 +120,7 @@ function extractCallArgumentBlocks(
       args: text.slice(openParenIndex + 1, closeParenIndex),
     });
 
-    pattern.lastIndex = closeParenIndex + 1;
+    globalPattern.lastIndex = closeParenIndex + 1;
   }
 
   return blocks;

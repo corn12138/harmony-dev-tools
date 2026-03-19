@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { analyzeText, extractBuildBlocks, DIAG_CODES } from '../src/language/diagnosticProvider';
+import { analyzeText, extractBuildBlocks, DIAG_CODES, isDarkThemeResourcePath } from '../src/language/diagnosticProvider';
 
 // We mock vscode.DiagnosticSeverity as plain numbers matching the enum
 // 0=Error, 1=Warning, 2=Information, 3=Hint
@@ -443,7 +443,11 @@ describe('api-level compatibility diagnostics', () => {
       '}',
     ].join('\n');
     const diags = analyzeText(code, undefined, { hasDarkThemeResource: false });
-    expect(diags.some((d) => d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE && d.message.includes('dark.json'))).toBe(true);
+    expect(diags.some((d) => (
+      d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE
+      && d.message.includes('dark.json')
+      && d.message.includes('resources/dark')
+    ))).toBe(true);
   });
 
   it('should not warn when WithTheme colorMode is used and dark.json resources exist', () => {
@@ -477,6 +481,20 @@ describe('api-level compatibility diagnostics', () => {
     ].join('\n');
     const diags = analyzeText(code, undefined, { hasDarkThemeResource: false });
     expect(diags.filter((d) => d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE)).toHaveLength(0);
+  });
+});
+
+describe('dark theme resource detection', () => {
+  it('should recognize legacy dark.json resources', () => {
+    expect(isDarkThemeResourcePath('/tmp/entry/src/main/resources/base/profile/dark.json')).toBe(true);
+  });
+
+  it('should recognize dark qualifier directories', () => {
+    expect(isDarkThemeResourcePath('/tmp/entry/src/main/resources/dark/element/color.json')).toBe(true);
+  });
+
+  it('should ignore non-dark resources', () => {
+    expect(isDarkThemeResourcePath('/tmp/entry/src/main/resources/base/element/color.json')).toBe(false);
   });
 });
 
