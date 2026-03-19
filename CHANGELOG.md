@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.6.11] - 2026-03-19
+- Added DevTools target discovery on top of the existing WebView one-click workflow, so the extension now queries the inspectable page list after USB forwarding or wireless endpoint detection.
+- When only one meaningful ArkWeb page is found, the extension can open that detected page directly; when multiple pages are found, it now offers an explicit page picker instead of forcing the user to guess inside Chrome inspect.
+- Added frontend-URL host rewriting and direct tests for `devtoolsFrontendUrl` parsing, so forwarded USB endpoints and wireless IPv4/IPv6 endpoints resolve to the correct current host instead of stale target hosts.
+
 ## [0.6.10] - 2026-03-19
 - Extended API 20+ wireless ArkWeb DevTools assistance from IPv4-only probing to dual-stack probing, so the extension can now discover and prefer usable device IPv6 addresses when IPv4 is unavailable.
 - Added IPv6-aware target formatting for Chrome inspect guidance, using bracketed host syntax for copied debug targets like `[ipv6]:port`.

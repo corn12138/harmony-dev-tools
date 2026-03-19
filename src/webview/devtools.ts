@@ -6,6 +6,7 @@ import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { parseRequestPermissionEntries } from '../project/projectConfigDiagnostics';
 import { formatDebugTarget, listHostNetworkAddresses, parseDeviceNetworkAddresses, pickPreferredDeviceAddress } from './network';
 import { hasWebViewUsage, parseWebDebuggingAccess, type WebDebuggingAccessConfig } from './projectAnalysis';
+import { buildDevToolsFrontendUrl, extractInspectablePageTargets, fetchDevToolsTargets, pickSuggestedInspectableTarget, type DevToolsTarget } from './targets';
 
 const WEBVIEW_DEVTOOLS_DOC_URL = 'https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/web/web-debugging-with-devtools.md';
 const CHROME_INSPECT_URL = 'chrome://inspect/#devices';
@@ -66,27 +67,23 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
 
       progress.report({ message: 'Forwarding WebView DevTools to localhost:9222...' });
       const port = await ensureWebViewDevToolsForward(device.id, socket);
+      const endpoint = `http://127.0.0.1:${port}`;
+      const targets = await fetchDevToolsTargets(endpoint).catch(() => []);
 
       progress.report({ message: 'Opening Chrome inspect...' });
       await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
 
-      const actions = ['Open Chrome Inspect', 'Open WebView Docs'];
+      const actions = buildWebViewActions(projectState?.moduleJsonUri, projectState?.hasInternetPermission, targets);
       if (projectState?.moduleJsonUri && !projectState.hasInternetPermission) {
-        actions.unshift('Open module.json5');
+        // handled by buildWebViewActions
       }
 
       const action = await vscode.window.showInformationMessage(
-        `WebView DevTools is ready on localhost:${port}. Chrome inspect can now discover the running ArkWeb page.`,
+        buildWebViewReadyMessage(`localhost:${port}`, targets),
         ...actions,
       );
 
-      if (action === 'Open Chrome Inspect') {
-        await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
-      } else if (action === 'Open WebView Docs') {
-        await vscode.env.openExternal(vscode.Uri.parse(WEBVIEW_DEVTOOLS_DOC_URL));
-      } else if (action === 'Open module.json5' && projectState?.moduleJsonUri) {
-        await vscode.commands.executeCommand('vscode.open', projectState.moduleJsonUri);
-      }
+      await handleWebViewAction(action, endpoint, targets, projectState?.moduleJsonUri);
     },
   );
 }
@@ -284,30 +281,21 @@ async function handleWirelessWebViewDebugging(
   moduleJsonUri?: vscode.Uri,
 ): Promise<void> {
   const selectedAddress = await selectWirelessDebugAddress(deviceId);
-  const target = selectedAddress ? formatDebugTarget(selectedAddress.address, port) : '<device-ip>:port';
-  const actions = [`Copy ${target}`, 'Open Chrome Inspect', 'Open WebView Docs'];
-  if (moduleJsonUri) {
-    actions.unshift('Open module.json5');
-  }
+  const target = selectedAddress ? formatDebugTarget(selectedAddress.address, port) : formatDebugTarget('<device-ip>', port);
+  const endpoint = selectedAddress ? buildHttpEndpoint(selectedAddress.address, port) : undefined;
+  const targets = endpoint ? await fetchDevToolsTargets(endpoint).catch(() => []) : [];
+  const actions = buildWebViewActions(moduleJsonUri, true, targets, target);
 
   await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
 
   const action = await vscode.window.showInformationMessage(
     selectedAddress
-      ? `Detected API 20+ wireless WebView debugging on ${target}. Chrome inspect has been opened; if needed, add ${target} under “Discover network targets”.`
-      : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add ${formatDebugTarget('<device-ip>', port)}.`,
+      ? buildWebViewReadyMessage(target, targets, true)
+      : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add ${target}.`,
     ...actions,
   );
 
-  if (action === `Copy ${target}`) {
-    await vscode.env.clipboard.writeText(target);
-  } else if (action === 'Open Chrome Inspect') {
-    await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
-  } else if (action === 'Open WebView Docs') {
-    await vscode.env.openExternal(vscode.Uri.parse(WEBVIEW_DEVTOOLS_DOC_URL));
-  } else if (action === 'Open module.json5' && moduleJsonUri) {
-    await vscode.commands.executeCommand('vscode.open', moduleJsonUri);
-  }
+  await handleWebViewAction(action, endpoint, targets, moduleJsonUri, target);
 }
 
 async function selectWirelessDebugAddress(deviceId: string): Promise<{ address: string } | undefined> {
@@ -339,6 +327,151 @@ async function discoverDeviceNetworkAddresses(deviceId: string) {
   }
 
   return [];
+}
+
+function buildHttpEndpoint(host: string, port: number): string {
+  return host.includes(':') ? `http://[${host}]:${port}` : `http://${host}:${port}`;
+}
+
+function buildWebViewReadyMessage(
+  targetLabel: string,
+  targets: DevToolsTarget[],
+  isWireless = false,
+): string {
+  const pages = extractInspectablePageTargets(targets);
+  const suggested = pickSuggestedInspectableTarget(targets);
+
+  if (suggested) {
+    const pageLabel = suggested.title || suggested.url || 'untitled page';
+    if (isWireless) {
+      return `Detected API 20+ wireless WebView debugging on ${targetLabel}. Chrome inspect has been opened, and the current page appears to be ${pageLabel}.`;
+    }
+    return `WebView DevTools is ready on ${targetLabel}. Chrome inspect can now discover the running ArkWeb page ${pageLabel}.`;
+  }
+
+  if (pages.length > 1) {
+    if (isWireless) {
+      return `Detected API 20+ wireless WebView debugging on ${targetLabel}. Chrome inspect has been opened, and ${pages.length} inspectable WebView pages were found.`;
+    }
+    return `WebView DevTools is ready on ${targetLabel}. Chrome inspect can now discover ${pages.length} running ArkWeb pages.`;
+  }
+
+  if (isWireless) {
+    return `Detected API 20+ wireless WebView debugging on ${targetLabel}. Chrome inspect has been opened; if needed, add ${targetLabel} under “Discover network targets”.`;
+  }
+  return `WebView DevTools is ready on ${targetLabel}. Chrome inspect can now discover the running ArkWeb page.`;
+}
+
+function buildWebViewActions(
+  moduleJsonUri: vscode.Uri | undefined,
+  hasInternetPermission: boolean | undefined,
+  targets: DevToolsTarget[],
+  copyTarget?: string,
+): string[] {
+  const actions = ['Open Chrome Inspect', 'Open WebView Docs'];
+  if (copyTarget) {
+    actions.unshift(`Copy ${copyTarget}`);
+  }
+
+  const pages = extractInspectablePageTargets(targets);
+  if (pickSuggestedInspectableTarget(targets)) {
+    actions.unshift('Open Detected Page');
+  } else if (pages.length > 1) {
+    actions.unshift('Choose Detected Page');
+  }
+
+  if (moduleJsonUri && hasInternetPermission === false) {
+    actions.unshift('Open module.json5');
+  }
+
+  return actions;
+}
+
+async function handleWebViewAction(
+  action: string | undefined,
+  endpoint: string | undefined,
+  targets: DevToolsTarget[],
+  moduleJsonUri?: vscode.Uri,
+  copyTarget?: string,
+): Promise<void> {
+  if (!action) {
+    return;
+  }
+
+  if (copyTarget && action === `Copy ${copyTarget}`) {
+    await vscode.env.clipboard.writeText(copyTarget);
+    return;
+  }
+
+  if (action === 'Open Chrome Inspect') {
+    await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
+    return;
+  }
+
+  if (action === 'Open WebView Docs') {
+    await vscode.env.openExternal(vscode.Uri.parse(WEBVIEW_DEVTOOLS_DOC_URL));
+    return;
+  }
+
+  if (action === 'Open module.json5' && moduleJsonUri) {
+    await vscode.commands.executeCommand('vscode.open', moduleJsonUri);
+    return;
+  }
+
+  if (!endpoint) {
+    return;
+  }
+
+  if (action === 'Open Detected Page') {
+    const target = pickSuggestedInspectableTarget(targets);
+    await openDevToolsTarget(endpoint, target);
+    return;
+  }
+
+  if (action === 'Choose Detected Page') {
+    const target = await pickDevToolsTarget(targets);
+    await openDevToolsTarget(endpoint, target);
+  }
+}
+
+async function pickDevToolsTarget(targets: DevToolsTarget[]): Promise<DevToolsTarget | undefined> {
+  const pages = extractInspectablePageTargets(targets);
+  if (pages.length === 0) {
+    return undefined;
+  }
+
+  if (pages.length === 1) {
+    return pages[0];
+  }
+
+  const pick = await vscode.window.showQuickPick(
+    pages.map((target) => ({
+      label: target.title || 'Untitled WebView',
+      description: target.url || 'about:blank',
+      detail: target.description || target.type,
+      target,
+    })),
+    {
+      placeHolder: 'Select the WebView page to inspect',
+      matchOnDescription: true,
+      matchOnDetail: true,
+    },
+  );
+
+  return pick?.target;
+}
+
+async function openDevToolsTarget(endpoint: string, target: DevToolsTarget | undefined): Promise<void> {
+  if (!target) {
+    return;
+  }
+
+  const frontendUrl = buildDevToolsFrontendUrl(endpoint, target);
+  if (!frontendUrl) {
+    return;
+  }
+
+  await vscode.env.openExternal(vscode.Uri.parse(frontendUrl));
 }
 
 async function safeReadText(uri: vscode.Uri): Promise<string | undefined> {
