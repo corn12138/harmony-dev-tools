@@ -7,9 +7,9 @@ const LIFECYCLE_METHODS = [
   { name: 'onPageShow', doc: 'Called when the page is displayed (Entry only)' },
   { name: 'onPageHide', doc: 'Called when the page is hidden (Entry only)' },
   { name: 'onBackPress', doc: 'Called when the back button is pressed (Entry only)' },
-  { name: 'aboutToReuse', doc: 'Called when a reusable component is about to be reused (@Reusable)' },
-  { name: 'aboutToRecycle', doc: 'Called when a reusable component is recycled (@Reusable)' },
-  { name: 'onWillApplyTheme', doc: 'Called before theme is applied to the component (API 12+)' },
+  { name: 'aboutToReuse', doc: 'Called when a reusable component is about to be reused (@Reusable / @ReusableV2)' },
+  { name: 'aboutToRecycle', doc: 'Called when a reusable component is recycled (@Reusable / @ReusableV2)' },
+  { name: 'onWillApplyTheme', doc: 'Called before theme is applied to the component. Commonly used with ThemeControl.setDefaultTheme() or WithTheme(...). API 12+; supported in state management V2 components from API 16.' },
 ];
 
 export function provideCompletionItems(

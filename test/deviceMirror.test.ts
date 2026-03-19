@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { getEmulatorLaunchArgs, parseListedEmulators } from '../src/device/emulatorManager';
 
 describe('Device Mirror', () => {
   describe('coordinate mapping', () => {
@@ -199,6 +200,28 @@ describe('Emulator Manager', () => {
   });
 
   describe('emulator status detection', () => {
+    it('should parse emulator names from CLI list output', () => {
+      expect(parseListedEmulators('Mate 70 Pro\nWatch X\n')).toEqual([
+        { name: 'Mate 70 Pro', dir: '', platform: 'unknown', running: false, deviceId: undefined },
+        { name: 'Watch X', dir: '', platform: 'unknown', running: false, deviceId: undefined },
+      ]);
+    });
+
+    it('should ignore empty lines in CLI list output', () => {
+      expect(parseListedEmulators('\nMate 70 Pro\n\n')).toEqual([
+        { name: 'Mate 70 Pro', dir: '', platform: 'unknown', running: false, deviceId: undefined },
+      ]);
+    });
+
+    it('should build DevEco launch arguments with -hvd', () => {
+      expect(getEmulatorLaunchArgs({
+        name: 'Mate 70 Pro',
+        dir: '',
+        platform: 'unknown',
+        running: false,
+      })).toEqual(['-hvd', 'Mate 70 Pro']);
+    });
+
     function isEmulatorDevice(id: string): boolean {
       return id.includes('127.0.0.1') || id.includes('localhost') || id.includes('emulator');
     }

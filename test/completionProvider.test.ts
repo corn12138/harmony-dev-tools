@@ -68,6 +68,17 @@ describe('completionProvider', () => {
       expect(labels).toContain('Type');
     });
 
+    it('should provide API 18+ decorator @ReusableV2 after @', () => {
+      const items = provideCompletionItems(
+        mockDocument('@'),
+        mockPosition(0, 1),
+        dummyToken,
+        dummyContext,
+      );
+      const labels = items.map(i => i.label);
+      expect(labels).toContain('ReusableV2');
+    });
+
     it('should provide @Sendable after @', () => {
       const items = provideCompletionItems(
         mockDocument('@'),
@@ -106,6 +117,7 @@ describe('completionProvider', () => {
       expect(labels).toContain('CalendarPicker');
       expect(labels).toContain('NodeContainer');
       expect(labels).toContain('SymbolGlyph');
+      expect(labels).toContain('WithTheme');
     });
 
     it('should include API 13+ components', () => {
@@ -154,9 +166,10 @@ describe('completionProvider', () => {
         dummyToken,
         dummyContext,
       );
-      const labels = items.map(i => i.label);
-      expect(labels).toContain('aboutToReuse');
-      expect(labels).toContain('aboutToRecycle');
+      const byLabel = new Map(items.map(i => [String(i.label), i]));
+      expect(byLabel.has('aboutToReuse')).toBe(true);
+      expect(byLabel.has('aboutToRecycle')).toBe(true);
+      expect(String(byLabel.get('aboutToReuse')?.documentation)).toContain('@ReusableV2');
     });
 
     it('should provide onWillApplyTheme (API 12+)', () => {
@@ -166,8 +179,10 @@ describe('completionProvider', () => {
         dummyToken,
         dummyContext,
       );
-      const labels = items.map(i => i.label);
-      expect(labels).toContain('onWillApplyTheme');
+      const byLabel = new Map(items.map(i => [String(i.label), i]));
+      expect(byLabel.has('onWillApplyTheme')).toBe(true);
+      expect(String(byLabel.get('onWillApplyTheme')?.documentation)).toContain('API 16');
+      expect(String(byLabel.get('onWillApplyTheme')?.documentation)).toContain('ThemeControl.setDefaultTheme');
     });
   });
 });

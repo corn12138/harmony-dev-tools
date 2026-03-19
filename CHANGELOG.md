@@ -1,5 +1,83 @@
 # Changelog
 
+## [Unreleased]
+
+## [0.6.6] - 2026-03-19
+- Added theme-related guidance for `ThemeControl.setDefaultTheme` and `onWillApplyTheme`, including docs shortcuts, snippets, and V2 compatibility warnings below API 16.
+- Added a focused diagnostic when `ThemeControl.setDefaultTheme()` is called inside `build()`, with a quick link back to the official ThemeControl docs.
+- Added an info-level hint when a `CustomTheme` class is instantiated but does not override `colors`, to help explain “theme changed but UI did not” cases without breaking older projects.
+- Added a project-aware warning when `WithTheme({ colorMode: ... })` is used without any `dark.json` resources, matching the official dark-mode setup guidance while caching the resource check for editor performance.
+
+## [0.6.5] - 2026-03-18
+- Aligned performance hints with current ArkUI docs by recognizing `Repeat` as a positive list-rendering strategy alongside `LazyForEach`, while keeping existing `ForEach` compatibility and quick fixes intact.
+- Updated `@ComponentV2` metadata and lifecycle completion docs to reflect `freezeWhenInactive`, `@ReusableV2`, and `onWillApplyTheme` support notes from newer state-management documentation.
+- Expanded the docs quick picker with official links for `Repeat`, component freezing, and the latest state-management V1/V2 overview.
+- Added `@ReusableV2` metadata with API 18 compatibility tracking, hover/completion coverage, and constant-table support so newer reuse patterns are recognized without breaking older projects.
+- Added `repeatv2` and `reusablev2` snippets, plus a `Repeat` docs quick fix next to the existing `ForEach → LazyForEach` action.
+- Added a compatibility diagnostic for the official `@ReusableV2` restriction inside `Repeat.template`, with quick links back to the `Repeat` and `@ReusableV2` docs instead of forcing code rewrites.
+- Added `WithTheme` as a first-class ArkUI container in metadata, completion, docs search, and snippets, so theme skinning flows are easier to discover directly inside VS Code.
+- Added a lightweight compatibility warning when `WithTheme` is used inside `@ComponentV2` files targeting API lower than 16, matching the newer state-management guidance without breaking older V1 projects.
+
+## [0.6.4] - 2026-03-14
+
+> Summary: this is a stabilization patch for the new quick-action UX.
+> 摘要：这是针对新快捷操作体验的一次稳定性补丁。
+
+- Fixed the startup registration race behind `No view is registered with id: harmony.quickActionsView` by waiting for `harmony.isHarmonyProject` context setup before the extension registers Harmony views.
+- Added a regression test to keep project detection from finishing before `setContext` completes.
+
+## [0.6.3] - 2026-03-14
+
+> Summary: this release removes a lot of `Command Palette` hunting and brings the main HarmonyOS workflow into visible VS Code UI.
+> 摘要：这一版重点是减少对命令面板搜索的依赖，把鸿蒙开发最常用的操作直接放到 VS Code 可见界面里。
+
+- Added a `Quick Actions` sidebar so high-frequency HarmonyOS actions are grouped in one always-visible panel instead of relying on `Command Palette` search.
+- Added a `HarmonyOS` status-bar control center that opens the main run, device, inspect, and setup actions from one quick pick.
+- Added device-tree context actions for selecting the active device, opening mirror, inspecting UI, streaming logs, taking screenshots, and launching or stopping emulators.
+- Improved device discoverability by showing the active target directly inside the device tree and reusing that target across mirror, logs, screenshot, and inspector workflows.
+
+## [0.6.2] - 2026-03-14
+- Added real signing-profile bundleName parsing from `build-profile.json5 -> signingConfigs[].material.profile (.p7b)`, plus pre-build diagnostics and one-click sync for `app.json5` when the signing profile bundleName does not match.
+- Improved `Build & Run` failure reporting so hvigor signing/configuration errors surface as concise, actionable messages instead of a truncated shell command dump.
+- Improved device UX when HDC is unavailable: the status bar now shows `HDC Offline`, device commands explain HDC server failures instead of pretending no devices exist, and environment checks probe live `hdc list targets`.
+
+## [0.6.1] - 2026-03-14
+
+> Summary: this cycle focused on easier onboarding, safer project migration, and lower-friction device workflows.
+> 摘要：这一轮重点是更容易上手、更安全的工程迁移，以及更顺手的设备工作流。
+
+### Added
+- **Project config diagnostics**:
+  - Added targeted diagnostics for legacy `build-profile.json5` migration gaps such as missing `targetSdkVersion` and `buildModeSet`
+  - Added startup-chain validation for `module.json5`, `main_pages.json`, `EntryAbility.loadContent()`, and `@Entry` page decorators
+  - Added `routerMap` / `route_map.json` / Navigation named-route validation, including `buildFunction` and NavPathStack route-name checks
+  - Added Quick Fix support for migrating legacy `build-profile.json5` content and inserting missing `@Entry`
+
+### Fixed
+- **Extension details readability**:
+  - Reworked README top sections so first-time users can find setup steps and main workflows faster
+  - Renamed command and view labels in the manifest to make the VS Code “Features” tab clearer
+  - Added a concise summary at the top of the changelog for faster scanning
+- **build-profile migration correctness**:
+  - Migrates missing `targetSdkVersion` per product instead of only touching the first product
+  - Avoids corrupting `modules` when `products` is empty
+- **Device and emulator target selection**:
+  - Device Mirror, UI Inspector, screenshots, and hilog now prompt for or retain the intended target device
+  - Added an active-device status bar so run, mirror, screenshot, and inspector actions reuse one shared target device
+  - Mirror and Inspector now follow active-device switches instead of silently keeping stale panel targets
+  - Emulator launch waits for a newly appeared emulator HDC target instead of treating any connected device as success
+  - Device tree passes concrete device IDs into mirror actions
+  - `Refresh Device List` now registers immediately during activation instead of waiting on the device tree import timing
+  - Emulator discovery now falls back to the DevEco emulator CLI list when legacy instance directories are absent
+  - Emulator launch now uses DevEco's `-hvd` argument instead of the incompatible Android-style `-avd`
+- **Project config diagnostic performance**:
+  - Full startup-chain rescans no longer run on every `.ets` keystroke; `.ets` changes are revalidated on save
+  - Added refresh-version guarding to reduce stale diagnostic writes during overlapping scans
+- **Cross-platform screenshot temp paths**:
+  - Device screenshots now use the host OS temp directory instead of hardcoded `/tmp`
+- **Plugin activation smoke coverage**:
+  - Added extension-host smoke tests for activation, command registration, debug launch wiring, and module deactivation
+
 ## [0.6.0] - 2026-03-14
 
 ### Added

@@ -17,6 +17,10 @@ describe('constants', () => {
       }
     });
 
+    it('should contain API 18+ reusable decorator', () => {
+      expect(ARKTS_DECORATORS).toContain('@ReusableV2');
+    });
+
     it('should contain API 13+ decorators', () => {
       expect(ARKTS_DECORATORS).toContain('@Require');
     });
@@ -70,6 +74,7 @@ describe('constants', () => {
       expect(API_VERSIONS.API_13).toBe(13);
       expect(API_VERSIONS.API_14).toBe(14);
       expect(API_VERSIONS.API_17).toBe(17);
+      expect(API_VERSIONS.API_18).toBe(18);
       expect(API_VERSIONS.API_20).toBe(20);
       expect(API_VERSIONS.API_22).toBe(22);
     });

@@ -52,7 +52,7 @@ describe('configHoverProvider', () => {
 
     it('module should have essential keys', () => {
       const mod = CONFIG_KEY_DOCS['module'];
-      const essentialKeys = ['name', 'type', 'deviceTypes', 'pages', 'abilities'];
+      const essentialKeys = ['name', 'type', 'deviceTypes', 'pages', 'routerMap', 'abilities'];
       for (const key of essentialKeys) {
         expect(mod[key]).toBeDefined();
       }

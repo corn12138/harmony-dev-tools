@@ -65,6 +65,14 @@ describe('hoverProvider', () => {
     });
   });
 
+  describe('API 18+ decorators', () => {
+    it('should provide hover for @ReusableV2', () => {
+      const doc = mockDocument('@ReusableV2');
+      const hover = provideHover(doc, mockPosition, dummyToken);
+      expect(hover).toBeDefined();
+    });
+  });
+
   describe('common decorators', () => {
     it('should provide hover for @Builder', () => {
       const doc = mockDocument('@Builder');

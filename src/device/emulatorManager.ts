@@ -1,20 +1,25 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec, ChildProcess } from 'child_process';
+import { exec, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import { listHdcTargets } from '../utils/hdc';
-
-const execAsync = promisify(exec);
 
 export interface EmulatorInfo {
   name: string;
   dir: string;
   platform: string;
   running: boolean;
+  deviceId?: string;
 }
 
 let runningProcess: ChildProcess | undefined;
+let runningEmulatorSession: { name: string; deviceId?: string } | undefined;
+const execAsync = promisify(exec);
+
+function isEmulatorTarget(target: string): boolean {
+  return target.includes('127.0.0.1') || target.includes('localhost') || target.includes('emulator');
+}
 
 /**
  * Detect installed DevEco Studio emulator images across platforms.
@@ -50,6 +55,7 @@ export function detectEmulators(): EmulatorInfo[] {
             dir: emuDir,
             platform,
             running: false,
+            deviceId: undefined,
           });
         }
       }
@@ -57,6 +63,43 @@ export function detectEmulators(): EmulatorInfo[] {
   }
 
   return emulators;
+}
+
+export function parseListedEmulators(stdout: string): EmulatorInfo[] {
+  return stdout
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((name) => ({
+      name,
+      dir: '',
+      platform: 'unknown',
+      running: false,
+      deviceId: undefined,
+    }));
+}
+
+export function getEmulatorLaunchArgs(emulator: EmulatorInfo): string[] {
+  return ['-hvd', emulator.name];
+}
+
+async function detectEmulatorsWithFallback(): Promise<EmulatorInfo[]> {
+  const detected = detectEmulators();
+  if (detected.length > 0) {
+    return detected;
+  }
+
+  const binary = findEmulatorBinary();
+  if (!binary) {
+    return [];
+  }
+
+  try {
+    const { stdout } = await execAsync(`"${binary}" -list`, { timeout: 5000 });
+    return parseListedEmulators(stdout);
+  } catch {
+    return [];
+  }
 }
 
 function getEmulatorSearchDirs(): string[] {
@@ -120,8 +163,8 @@ function findEmulatorBinary(): string | null {
   return null;
 }
 
-export async function launchEmulator(): Promise<void> {
-  const emulators = detectEmulators();
+export async function launchEmulator(preferredName?: string): Promise<void> {
+  const emulators = await detectEmulatorsWithFallback();
 
   if (emulators.length === 0) {
     const action = await vscode.window.showWarningMessage(
@@ -136,7 +179,10 @@ export async function launchEmulator(): Promise<void> {
     return;
   }
 
-  const selected = emulators.length === 1
+  const selectedByName = preferredName
+    ? emulators.find((emulator) => emulator.name === preferredName)
+    : undefined;
+  const selected = selectedByName ?? (emulators.length === 1
     ? emulators[0]
     : await vscode.window.showQuickPick(
         emulators.map(e => ({
@@ -145,7 +191,7 @@ export async function launchEmulator(): Promise<void> {
           emulator: e,
         })),
         { placeHolder: 'Select an emulator to launch' }
-      ).then(pick => pick?.emulator);
+      ).then(pick => pick?.emulator));
 
   if (!selected) return;
 
@@ -172,15 +218,17 @@ export async function launchEmulator(): Promise<void> {
 
 async function startEmulatorProcess(binary: string, emulator: EmulatorInfo): Promise<void> {
   try {
+    const baselineTargets: string[] = await listHdcTargets(3000).catch(() => []);
+    runningEmulatorSession = { name: emulator.name };
+
     await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'HarmonyOS', cancellable: true },
       async (progress, token) => {
         progress.report({ message: `Starting emulator "${emulator.name}"...` });
 
-        runningProcess = exec(
-          `"${binary}" -avd "${emulator.name}"`,
-          { timeout: 0 },
-        );
+        runningProcess = spawn(binary, getEmulatorLaunchArgs(emulator), {
+          stdio: 'ignore',
+        });
 
         runningProcess.on('error', (err) => {
           vscode.window.showErrorMessage(`Emulator failed: ${err.message}`);
@@ -191,20 +239,28 @@ async function startEmulatorProcess(binary: string, emulator: EmulatorInfo): Pro
             vscode.window.showWarningMessage(`Emulator exited with code ${code}`);
           }
           runningProcess = undefined;
+          if (runningEmulatorSession?.name === emulator.name) {
+            runningEmulatorSession = undefined;
+          }
         });
 
         for (let i = 0; i < 30; i++) {
           if (token.isCancellationRequested) return;
           await sleep(2000);
           try {
-            if ((await listHdcTargets(3000)).length > 0) {
+            const onlineTargets = await listHdcTargets(3000);
+            const newTargets = onlineTargets.filter((target) => !baselineTargets.includes(target));
+            const emulatorTarget = newTargets.find(isEmulatorTarget);
+
+            if (emulatorTarget) {
+              runningEmulatorSession = { name: emulator.name, deviceId: emulatorTarget };
               progress.report({ message: 'Emulator online!' });
               vscode.window.showInformationMessage(
                 `Emulator "${emulator.name}" is running.`,
                 'Open Device Mirror'
               ).then(action => {
                 if (action) {
-                  vscode.commands.executeCommand('harmony.openDeviceMirror');
+                  vscode.commands.executeCommand('harmony.openDeviceMirror', emulatorTarget);
                 }
               });
               return;
@@ -226,38 +282,45 @@ export async function stopEmulator(): Promise<void> {
   if (runningProcess) {
     runningProcess.kill();
     runningProcess = undefined;
+    runningEmulatorSession = undefined;
     vscode.window.showInformationMessage('Emulator process terminated.');
     return;
   }
 
-  // Try to find and kill emulator via shell
-  try {
-    if (process.platform === 'win32') {
-      await execAsync('taskkill /F /IM emulator.exe', { timeout: 5000 });
-    } else {
-      await execAsync('pkill -f "emulator.*-avd"', { timeout: 5000 });
-    }
-    vscode.window.showInformationMessage('Emulator stopped.');
-  } catch {
-    vscode.window.showInformationMessage('No running emulator found.');
-  }
+  vscode.window.showInformationMessage('No emulator process launched by the extension is currently running.');
 }
 
 /**
  * Get a list of emulators with their running status for the TreeView.
  */
 export async function getEmulatorStatus(): Promise<EmulatorInfo[]> {
-  const emulators = detectEmulators();
+  const emulators = await detectEmulatorsWithFallback();
 
   let onlineDevices: string[] = [];
   try {
     onlineDevices = await listHdcTargets(3000);
   } catch { /* ignore */ }
 
+  const onlineEmulators = onlineDevices.filter(isEmulatorTarget);
+  const preferredDeviceId = runningEmulatorSession?.deviceId && onlineEmulators.includes(runningEmulatorSession.deviceId)
+    ? runningEmulatorSession.deviceId
+    : (onlineEmulators.length === 1 ? onlineEmulators[0] : undefined);
+
   for (const emu of emulators) {
-    emu.running = onlineDevices.some(d =>
-      d.includes('127.0.0.1') || d.includes('localhost') || d.includes('emulator')
-    );
+    if (runningEmulatorSession?.name === emu.name && preferredDeviceId) {
+      emu.running = true;
+      emu.deviceId = preferredDeviceId;
+      continue;
+    }
+
+    if (!runningEmulatorSession && emulators.length === 1 && onlineEmulators.length === 1) {
+      emu.running = true;
+      emu.deviceId = onlineEmulators[0];
+      continue;
+    }
+
+    emu.running = false;
+    emu.deviceId = undefined;
   }
 
   return emulators;

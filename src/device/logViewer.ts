@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
-import { spawnHdc } from '../utils/hdc';
+import { buildHdcTargetArgs, spawnHdc } from '../utils/hdc';
+import { extractDeviceIdFromCommandArg } from './commandArgs';
+import { ensureConnectedDevice } from './devices';
 
 let logProcess: Awaited<ReturnType<typeof spawnHdc>> | null = null;
 let outputChannel: vscode.OutputChannel | null = null;
 
-export async function viewLogs(): Promise<void> {
+export async function viewLogs(deviceArg?: unknown): Promise<void> {
   if (logProcess) {
     logProcess.kill();
     logProcess = null;
@@ -17,7 +19,16 @@ export async function viewLogs(): Promise<void> {
   outputChannel.clear();
 
   try {
-    logProcess = await spawnHdc(['hilog'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const device = await ensureConnectedDevice({
+      placeHolder: 'Select a device to stream hilog from',
+      preferredId: extractDeviceIdFromCommandArg(deviceArg),
+    });
+    if (!device) {
+      return;
+    }
+
+    outputChannel.appendLine(`[Target] ${device.id}`);
+    logProcess = await spawnHdc([...buildHdcTargetArgs(device.id), 'hilog'], { stdio: ['ignore', 'pipe', 'pipe'] });
 
     logProcess.stdout?.on('data', (data: Buffer) => {
       outputChannel?.append(data.toString());

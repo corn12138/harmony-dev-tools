@@ -37,7 +37,7 @@ export class ProjectDetectorModule implements HarmonyModule {
     if (projectInfo) {
       currentProjectInfo = projectInfo;
       // Set context for when-clauses
-      vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_HARMONY_PROJECT, true);
+      await vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_HARMONY_PROJECT, true);
 
       // Show status bar
       this.statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -63,7 +63,7 @@ export class ProjectDetectorModule implements HarmonyModule {
     } else {
       currentProjectInfo = undefined;
       currentProjectFileIndex = undefined;
-      vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_HARMONY_PROJECT, false);
+      await vscode.commands.executeCommand('setContext', CONTEXT_KEYS.IS_HARMONY_PROJECT, false);
     }
 
     this.isActive = true;

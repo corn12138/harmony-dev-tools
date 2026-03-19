@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { detectEmulators, type EmulatorInfo } from './emulatorManager';
-import { listConnectedDevices } from './devices';
+import { getEmulatorStatus, type EmulatorInfo } from './emulatorManager';
+import { getActiveDeviceId, listConnectedDevices } from './devices';
 import type { HarmonyEventBus } from '../core/eventBus';
 
 type TreeNode = DeviceItem | SectionItem;
@@ -47,13 +47,7 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<TreeNode | Em
     }));
 
     try {
-      this.emulators = detectEmulators();
-      const onlineIds = this.devices.map(d => d.id);
-      for (const emu of this.emulators) {
-        emu.running = onlineIds.some(id =>
-          id.includes('127.0.0.1') || id.includes('localhost') || id.includes('emulator')
-        );
-      }
+      this.emulators = await getEmulatorStatus();
     } catch {
       this.emulators = [];
     }
@@ -78,8 +72,11 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<TreeNode | Em
 
     if (element.kind === 'emulator') {
       const emu = element.info;
+      const isActive = emu.deviceId && emu.deviceId === getActiveDeviceId();
       const item = new vscode.TreeItem(emu.name, vscode.TreeItemCollapsibleState.None);
-      item.description = emu.running ? 'running' : emu.platform;
+      item.description = emu.running
+        ? (isActive ? 'running · active' : 'running')
+        : emu.platform;
       item.iconPath = new vscode.ThemeIcon(emu.running ? 'vm-active' : 'vm');
       item.contextValue = emu.running ? 'emulator-running' : 'emulator-stopped';
       item.tooltip = `Emulator: ${emu.name}\nPath: ${emu.dir}\nPlatform: ${emu.platform}\nStatus: ${emu.running ? 'running' : 'stopped'}`;
@@ -92,22 +89,25 @@ export class DeviceTreeProvider implements vscode.TreeDataProvider<TreeNode | Em
         item.command = {
           command: 'harmony.openDeviceMirror',
           title: 'Open Device Mirror',
+          arguments: emu.deviceId ? [emu.deviceId] : undefined,
         };
       }
       return item;
     }
 
     // DeviceItem
+    const isActive = element.id === getActiveDeviceId();
     const item = new vscode.TreeItem(element.name, vscode.TreeItemCollapsibleState.None);
-    item.description = element.status;
+    item.description = isActive ? `${element.status} · active` : element.status;
     item.iconPath = new vscode.ThemeIcon(
       element.status === 'online' ? 'device-mobile' : 'debug-disconnect'
     );
-    item.contextValue = 'device';
+    item.contextValue = element.status === 'online' ? 'device-online' : 'device-offline';
     item.tooltip = `Device ID: ${element.id}\nStatus: ${element.status}`;
     item.command = {
       command: 'harmony.openDeviceMirror',
       title: 'Open Device Mirror',
+      arguments: [element.id],
     };
     return item;
   }

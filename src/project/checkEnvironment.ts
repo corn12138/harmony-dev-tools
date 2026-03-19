@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getSdkPath, getHdcPath, resolveHdcPath, resolveToolPath } from '../utils/config';
+import { coerceHdcCommandError, describeHdcCommandError, listHdcTargets } from '../utils/hdc';
 import { CONFIG_FILES } from '../utils/constants';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 
@@ -82,19 +83,22 @@ export async function checkEnvironment(): Promise<void> {
   const configuredHdc = getHdcPath();
   if (configuredHdc && fs.existsSync(configuredHdc)) {
     ok(`已配置: ${configuredHdc}`);
+    await appendHdcRuntimeStatus(ok, warn, fail);
   } else {
     try {
       const resolved = await resolveHdcPath();
       if (resolved && resolved !== 'hdc' && fs.existsSync(resolved)) {
         ok(`自动检测: ${resolved}`);
+        await appendHdcRuntimeStatus(ok, warn, fail);
       } else if (resolved === 'hdc') {
         warn('未找到 HDC，设备/模拟器操作将不可用');
         fail('请安装 HarmonyOS SDK 或配置 harmony.hdcPath', DOC_HDC);
       } else {
         ok(`使用: ${resolved}`);
+        await appendHdcRuntimeStatus(ok, warn, fail);
       }
-    } catch {
-      fail('HDC 解析失败，请配置 harmony.hdcPath', DOC_HDC);
+    } catch (error) {
+      fail(describeHdcCommandError(coerceHdcCommandError(error, 'hdc', ['list', 'targets'])), DOC_HDC);
     }
   }
   channel.appendLine('');
@@ -131,4 +135,20 @@ export async function checkEnvironment(): Promise<void> {
   channel.appendLine(`  Command Line Tools: ${DOC_COMMAND_LINE_TOOLS}`);
   channel.appendLine(`  版本说明: ${DOC_RELEASE_NOTES}`);
   channel.appendLine(`  知识地图: ${DOC_KNOWLEDGE_MAP}`);
+
+  async function appendHdcRuntimeStatus(
+    okStatus: (message: string) => void,
+    warnStatus: (message: string) => void,
+    failStatus: (message: string, doc?: string) => void,
+  ): Promise<void> {
+    try {
+      const targets = await listHdcTargets(3000);
+      okStatus(`HDC 可访问，当前在线目标: ${targets.length}`);
+      if (targets.length === 0) {
+        warnStatus('HDC 服务正常，但当前没有在线设备/模拟器');
+      }
+    } catch (error) {
+      failStatus(describeHdcCommandError(coerceHdcCommandError(error, 'hdc', ['list', 'targets'])), DOC_HDC);
+    }
+  }
 }

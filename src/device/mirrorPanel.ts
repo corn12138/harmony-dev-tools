@@ -6,7 +6,7 @@ import {
   sendKeyEvent,
   sendLongPress,
 } from '../debug/uiInspector';
-import { listHdcTargets } from '../utils/hdc';
+import { ensureConnectedDevice, getActiveDeviceId, setActiveDeviceId } from './devices';
 
 let panel: vscode.WebviewPanel | undefined;
 let refreshTimer: ReturnType<typeof setInterval> | undefined;
@@ -17,22 +17,29 @@ let framePending = false;
 
 /**
  * Open the Device Mirror panel. Optionally target a specific device.
- * If no device is specified, auto-selects the first online device.
+ * If no device is specified, uses the current active device or asks the user to choose one.
  */
 export async function openDeviceMirror(deviceId?: string): Promise<void> {
-  if (panel) {
-    panel.reveal(vscode.ViewColumn.Beside);
-    if (deviceId) {
-      currentDeviceId = deviceId;
+  if (!deviceId) {
+    const preferredId = getActiveDeviceId() ?? currentDeviceId;
+    const device = await ensureConnectedDevice({
+      placeHolder: 'Select a device to mirror',
+      preferredId,
+    });
+    if (!device) {
+      return;
     }
-    return;
+    deviceId = device.id;
   }
 
-  // Auto-detect device if not specified
-  if (!deviceId) {
-    deviceId = await autoSelectDevice();
+  applyCurrentDevice(deviceId);
+
+  if (panel) {
+    panel.reveal(vscode.ViewColumn.Beside);
+    panel.title = `Mirror: ${currentDeviceId}`;
+    await pushFrame();
+    return;
   }
-  currentDeviceId = deviceId;
 
   panel = vscode.window.createWebviewPanel(
     'harmonyDeviceMirror',
@@ -90,12 +97,9 @@ export async function openDeviceMirror(deviceId?: string): Promise<void> {
   }
 }
 
-async function autoSelectDevice(): Promise<string | undefined> {
-  try {
-    return (await listHdcTargets(3000))[0];
-  } catch {
-    return undefined;
-  }
+function applyCurrentDevice(deviceId?: string): void {
+  currentDeviceId = deviceId;
+  setActiveDeviceId(deviceId);
 }
 
 function startStreaming(fps: number): void {

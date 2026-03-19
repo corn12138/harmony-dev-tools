@@ -1,8 +1,8 @@
 {
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
-  "description": "Lightweight & powerful HarmonyOS development toolkit for VS Code",
-  "version": "0.6.0",
+  "description": "Build, run, debug, inspect, and validate HarmonyOS apps directly in VS Code",
+  "version": "0.6.6",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -98,18 +98,24 @@
     "commands": [
       {
         "command": "harmony.createProject",
-        "title": "Create New Project",
+        "title": "Create HarmonyOS Project",
         "category": "HarmonyOS"
       },
       {
+        "command": "harmony.openControlCenter",
+        "title": "Open HarmonyOS Control Center",
+        "category": "HarmonyOS",
+        "icon": "$(rocket)"
+      },
+      {
         "command": "harmony.buildHap",
-        "title": "Build HAP",
+        "title": "Build HAP Package",
         "category": "HarmonyOS",
         "icon": "$(play)"
       },
       {
         "command": "harmony.runOnDevice",
-        "title": "Run on Device",
+        "title": "Run Built App on Device",
         "category": "HarmonyOS",
         "icon": "$(debug-start)"
       },
@@ -120,9 +126,21 @@
       },
       {
         "command": "harmony.viewDevices",
-        "title": "Refresh Devices",
+        "title": "Refresh Device List",
         "category": "HarmonyOS",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "harmony.selectDevice",
+        "title": "Select Active Device",
+        "category": "HarmonyOS",
+        "icon": "$(device-mobile)"
+      },
+      {
+        "command": "harmony.useDevice",
+        "title": "Use This Device",
+        "category": "HarmonyOS",
+        "icon": "$(device-mobile)"
       },
       {
         "command": "harmony.installHap",
@@ -131,12 +149,12 @@
       },
       {
         "command": "harmony.viewLogs",
-        "title": "View Device Logs",
+        "title": "Open Device Logs (hilog)",
         "category": "HarmonyOS"
       },
       {
         "command": "harmony.previewComponent",
-        "title": "Preview Component",
+        "title": "Preview ArkUI Component",
         "category": "HarmonyOS",
         "icon": "$(open-preview)"
       },
@@ -167,41 +185,41 @@
       },
       {
         "command": "harmony.manageDeps",
-        "title": "Manage Dependencies",
+        "title": "Manage OHPM Dependencies",
         "category": "HarmonyOS"
       },
       {
         "command": "harmony.openDocs",
-        "title": "Search HarmonyOS Docs",
+        "title": "Open HarmonyOS Docs Search",
         "category": "HarmonyOS"
       },
       {
         "command": "harmony.uiInspector",
-        "title": "Open UI Inspector",
+        "title": "Inspect Running UI",
         "category": "HarmonyOS",
         "icon": "$(inspect)"
       },
       {
         "command": "harmony.takeScreenshot",
-        "title": "Take Device Screenshot",
+        "title": "Capture Device Screenshot",
         "category": "HarmonyOS",
         "icon": "$(device-camera)"
       },
       {
         "command": "harmony.buildAndRun",
-        "title": "Build & Run on Device",
+        "title": "One-Click Build, Install & Run",
         "category": "HarmonyOS",
         "icon": "$(rocket)"
       },
       {
         "command": "harmony.terminalBuildAndRun",
-        "title": "Build & Run (Terminal)",
+        "title": "Build, Install & Run in Terminal",
         "category": "HarmonyOS",
         "icon": "$(terminal)"
       },
       {
         "command": "harmony.stopApp",
-        "title": "Stop App on Device",
+        "title": "Stop Running App on Device",
         "category": "HarmonyOS",
         "icon": "$(debug-stop)"
       },
@@ -217,8 +235,13 @@
         "category": "HarmonyOS"
       },
       {
+        "command": "harmony.migrateBuildProfile",
+        "title": "Upgrade Legacy build-profile",
+        "category": "HarmonyOS"
+      },
+      {
         "command": "harmony.checkApiCompat",
-        "title": "Check API Compatibility",
+        "title": "Check API / SDK Compatibility",
         "category": "HarmonyOS"
       },
       {
@@ -229,7 +252,7 @@
       },
       {
         "command": "harmony.launchEmulator",
-        "title": "Launch Emulator",
+        "title": "Start Emulator",
         "category": "HarmonyOS",
         "icon": "$(vm)"
       },
@@ -241,7 +264,7 @@
       },
       {
         "command": "harmony.checkEnvironment",
-        "title": "Check Environment",
+        "title": "Check SDK / HDC Environment",
         "category": "HarmonyOS",
         "icon": "$(checklist)"
       }
@@ -258,18 +281,23 @@
     "views": {
       "harmony-explorer": [
         {
+          "id": "harmony.quickActionsView",
+          "name": "Quick Actions",
+          "when": "harmony.isHarmonyProject"
+        },
+        {
           "id": "harmony.projectView",
-          "name": "Project",
+          "name": "Project Files",
           "when": "harmony.isHarmonyProject"
         },
         {
           "id": "harmony.deviceView",
-          "name": "Devices",
+          "name": "Connected Devices",
           "when": "harmony.isHarmonyProject"
         },
         {
           "id": "harmony.resourceView",
-          "name": "Resources",
+          "name": "App Resources",
           "when": "harmony.isHarmonyProject"
         }
       ]
@@ -300,6 +328,11 @@
           "command": "harmony.migrateV1ToV2",
           "when": "editorLangId == arkts",
           "group": "1_modification"
+        },
+        {
+          "command": "harmony.migrateBuildProfile",
+          "when": "resourceFilename == build-profile.json5",
+          "group": "1_modification"
         }
       ],
       "editor/title": [
@@ -326,9 +359,51 @@
       ],
       "view/title": [
         {
+          "command": "harmony.openControlCenter",
+          "when": "view == harmony.quickActionsView",
+          "group": "navigation"
+        },
+        {
           "command": "harmony.viewDevices",
           "when": "view == harmony.deviceView",
           "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "harmony.useDevice",
+          "when": "view == harmony.deviceView && (viewItem == device-online || viewItem == emulator-running)",
+          "group": "inline"
+        },
+        {
+          "command": "harmony.openDeviceMirror",
+          "when": "view == harmony.deviceView && (viewItem == device-online || viewItem == emulator-running)",
+          "group": "navigation"
+        },
+        {
+          "command": "harmony.uiInspector",
+          "when": "view == harmony.deviceView && (viewItem == device-online || viewItem == emulator-running)",
+          "group": "navigation"
+        },
+        {
+          "command": "harmony.viewLogs",
+          "when": "view == harmony.deviceView && (viewItem == device-online || viewItem == emulator-running)",
+          "group": "navigation"
+        },
+        {
+          "command": "harmony.takeScreenshot",
+          "when": "view == harmony.deviceView && (viewItem == device-online || viewItem == emulator-running)",
+          "group": "navigation"
+        },
+        {
+          "command": "harmony.launchEmulator",
+          "when": "view == harmony.deviceView && viewItem == emulator-stopped",
+          "group": "inline"
+        },
+        {
+          "command": "harmony.stopEmulator",
+          "when": "view == harmony.deviceView && viewItem == emulator-running",
+          "group": "inline"
         }
       ]
     },
@@ -343,7 +418,7 @@
         "harmony.hdcPath": {
           "type": "string",
           "default": "",
-          "description": "Path to HDC executable (auto-detected if empty)"
+          "description": "Custom path to the HDC executable. Leave empty to auto-detect."
         },
         "harmony.autoFormatOnSave": {
           "type": "boolean",
@@ -375,22 +450,27 @@
           "type": "number",
           "default": 5000,
           "minimum": 1000,
-          "description": "Device list refresh interval in milliseconds"
+          "description": "Refresh interval for the device list and active-device status bar, in milliseconds"
         },
         "harmony.enableDiagnostics": {
           "type": "boolean",
           "default": true,
-          "description": "Enable real-time ArkTS diagnostics (any/unknown, state traps, perf anti-patterns)"
+          "description": "Enable real-time ArkTS diagnostics for type issues, state traps, and common performance anti-patterns"
+        },
+        "harmony.enableProjectConfigDiagnostics": {
+          "type": "boolean",
+          "default": true,
+          "description": "Validate build-profile migration, startup page wiring, main_pages.json, routerMap, and Navigation route names"
         },
         "harmony.enablePerfLens": {
           "type": "boolean",
           "default": true,
-          "description": "Show performance insight CodeLens on build() and ForEach"
+          "description": "Show performance insight CodeLens on build(), ForEach, and component state usage"
         },
         "harmony.enableOhpmInsight": {
           "type": "boolean",
           "default": true,
-          "description": "Show OHPM dependency insights and outdated version warnings"
+          "description": "Show OHPM dependency insights, latest-version hints, and outdated package warnings"
         }
       }
     },

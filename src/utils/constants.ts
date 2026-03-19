@@ -12,10 +12,13 @@ export const CONFIG_FILES = {
 
 export const COMMANDS = {
   CREATE_PROJECT: 'harmony.createProject',
+  OPEN_CONTROL_CENTER: 'harmony.openControlCenter',
   BUILD_HAP: 'harmony.buildHap',
   RUN_ON_DEVICE: 'harmony.runOnDevice',
   CLEAN: 'harmony.clean',
   VIEW_DEVICES: 'harmony.viewDevices',
+  SELECT_DEVICE: 'harmony.selectDevice',
+  USE_DEVICE: 'harmony.useDevice',
   INSTALL_HAP: 'harmony.installHap',
   VIEW_LOGS: 'harmony.viewLogs',
   PREVIEW_COMPONENT: 'harmony.previewComponent',
@@ -33,6 +36,7 @@ export const COMMANDS = {
   STOP_APP: 'harmony.stopApp',
   DEBUG_APP: 'harmony.debugApp',
   MIGRATE_V1_TO_V2: 'harmony.migrateV1ToV2',
+  MIGRATE_BUILD_PROFILE: 'harmony.migrateBuildProfile',
   CHECK_API_COMPAT: 'harmony.checkApiCompat',
   DEVICE_MIRROR: 'harmony.openDeviceMirror',
   LAUNCH_EMULATOR: 'harmony.launchEmulator',
@@ -63,6 +67,8 @@ export const ARKTS_DECORATORS = [
   '@Require',
   // API 14+ new decorators
   '@Type',
+  // API 18+ reuse decorator
+  '@ReusableV2',
 ] as const;
 
 export const API_VERSIONS = {
@@ -70,6 +76,7 @@ export const API_VERSIONS = {
   API_13: 13,
   API_14: 14,
   API_17: 17,
+  API_18: 18,
   API_20: 20,
   API_22: 22,
 } as const;

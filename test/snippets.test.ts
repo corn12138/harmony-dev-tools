@@ -110,5 +110,25 @@ describe('arkts.snippets.json', () => {
       const found = Object.values(snippets).some((s: any) => s.prefix === 'repeat');
       expect(found).toBe(true);
     });
+
+    it('should have Repeat V2 item snippet', () => {
+      const found = Object.values(snippets).some((s: any) => s.prefix === 'repeatv2');
+      expect(found).toBe(true);
+    });
+
+    it('should have WithTheme snippet', () => {
+      const found = Object.values(snippets).some((s: any) => s.prefix === 'withtheme');
+      expect(found).toBe(true);
+    });
+
+    it('should have ThemeControl snippet', () => {
+      const found = Object.values(snippets).some((s: any) => s.prefix === 'themecontrol');
+      expect(found).toBe(true);
+    });
+
+    it('should have @ReusableV2 snippet', () => {
+      const found = Object.values(snippets).some((s: any) => s.prefix === 'reusablev2');
+      expect(found).toBe(true);
+    });
   });
 });

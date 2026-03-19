@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { getDecorators, getComponents, apiLabel, type DecoratorMeta } from '../utils/metadata';
 import { detectHarmonySdkFromBuildProfile } from '../utils/harmonySdk';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
+import { findReusableV2RepeatTemplateUsages } from './reusableV2RepeatDiagnostics';
+import { findCustomThemeShellUsages, findOnWillApplyThemeUsages, findThemeControlSetDefaultThemeUsages, findWithThemeColorModeUsages, findWithThemeUsages, hasComponentV2Decorator } from './withThemeDiagnostics';
 
 // ---------------------------------------------------------------------------
 // Diagnostic codes — referenced by codeFixProvider for Quick Fix matching
@@ -14,12 +16,20 @@ export const DIAG_CODES = {
   STATE_SHALLOW: 'arkts-state-shallow',
   V1_V2_MIX: 'arkts-v1v2-mix',
   LINK_IN_V2: 'arkts-link-in-v2',
+  REUSABLE_V2_REPEAT_TEMPLATE: 'arkts-reusablev2-repeat-template',
+  THEMECONTROL_IN_BUILD: 'arkts-themecontrol-in-build',
+  CUSTOM_THEME_NO_COLORS: 'arkts-customtheme-no-colors',
+  WITH_THEME_DARK_RESOURCE: 'arkts-witheme-dark-resource',
   FOREACH_PERF: 'arkts-foreach-perf',
   BUILD_HEAVY: 'arkts-build-heavy',
   API_LEVEL: 'arkts-api-level',
 } as const;
 
 export type DiagCode = (typeof DIAG_CODES)[keyof typeof DIAG_CODES];
+
+interface AnalyzeContext {
+  hasDarkThemeResource?: boolean;
+}
 
 const SOURCE = 'HarmonyOS';
 
@@ -49,7 +59,7 @@ const HEAVY_BUILD_PATTERNS: Array<{ pattern: RegExp; message: string }> = [
   { pattern: /\bfetch\s*\(/, message: 'Network requests in build() will fire on every re-render' },
   { pattern: /\bsetTimeout\s*\(/, message: 'setTimeout in build() creates repeated timers on re-render' },
   { pattern: /\bsetInterval\s*\(/, message: 'setInterval in build() creates leaked timers on re-render' },
-  { pattern: /\bfor\s*\(.*;.*;.*\)\s*\{/, message: 'Imperative loops in build() may degrade performance; prefer declarative ForEach/LazyForEach' },
+  { pattern: /\bfor\s*\(.*;.*;.*\)\s*\{/, message: 'Imperative loops in build() may degrade performance; prefer declarative ForEach/LazyForEach/Repeat' },
   { pattern: /\bwhile\s*\(/, message: 'while-loops in build() can block the UI thread' },
   { pattern: /\bconsole\.(log|warn|error|info)\s*\(/, message: 'console output in build() fires on every re-render; move to lifecycle methods' },
   { pattern: /\bJSON\.(parse|stringify)\s*\(/, message: 'JSON serialisation in build() is expensive; cache the result in a state variable' },
@@ -63,6 +73,8 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
   const collection = vscode.languages.createDiagnosticCollection('arkts-lint');
 
   let cachedApiLevel: number | undefined;
+  const darkThemeResourceCache = new Map<string, boolean>();
+  const runVersions = new Map<string, number>();
 
   const detectProjectApi = async () => {
     const rootUri = getPreferredWorkspaceFolder()?.uri;
@@ -76,9 +88,45 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
 
   detectProjectApi();
 
-  const runDiag = (doc: vscode.TextDocument) => {
+  const hasDarkThemeResource = async (folder: vscode.WorkspaceFolder | undefined): Promise<boolean> => {
+    if (!folder) {
+      return true;
+    }
+
+    const key = folder.uri.toString();
+    const cached = darkThemeResourceCache.get(key);
+    if (cached !== undefined) {
+      return cached;
+    }
+
+    const matches = await vscode.workspace.findFiles(
+      new vscode.RelativePattern(folder, '**/resources/**/dark.json'),
+      '**/node_modules/**',
+      20,
+    );
+    const result = matches.length > 0;
+    darkThemeResourceCache.set(key, result);
+    return result;
+  };
+
+  const runDiag = async (doc: vscode.TextDocument) => {
     if (doc.languageId !== 'arkts' && !doc.fileName.endsWith('.ets')) return;
-    const diagnostics = analyzeDocument(doc, cachedApiLevel);
+
+    const text = doc.getText();
+    const uriKey = doc.uri.toString();
+    const version = (runVersions.get(uriKey) ?? 0) + 1;
+    runVersions.set(uriKey, version);
+
+    const analyzeContext: AnalyzeContext = {};
+    if (findWithThemeColorModeUsages(text).length > 0) {
+      analyzeContext.hasDarkThemeResource = await hasDarkThemeResource(getPreferredWorkspaceFolder(doc.uri));
+    }
+
+    if (runVersions.get(uriKey) !== version) {
+      return;
+    }
+
+    const diagnostics = analyzeDocument(doc, cachedApiLevel, analyzeContext);
     collection.set(doc.uri, diagnostics);
   };
 
@@ -92,11 +140,22 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
     }
   });
 
+  const darkThemeWatcher = vscode.workspace.createFileSystemWatcher('**/resources/**/dark.json');
+  const invalidateDarkThemeCache = () => {
+    darkThemeResourceCache.clear();
+    if (vscode.window.activeTextEditor) {
+      runDiag(vscode.window.activeTextEditor.document);
+    }
+  };
+  darkThemeWatcher.onDidCreate(invalidateDarkThemeCache);
+  darkThemeWatcher.onDidChange(invalidateDarkThemeCache);
+  darkThemeWatcher.onDidDelete(invalidateDarkThemeCache);
+
   if (vscode.window.activeTextEditor) {
     runDiag(vscode.window.activeTextEditor.document);
   }
 
-  const disposable = vscode.Disposable.from(collection, onOpen, onSave, onChange, onConfigChange);
+  const disposable = vscode.Disposable.from(collection, onOpen, onSave, onChange, onConfigChange, darkThemeWatcher);
   context.subscriptions.push(disposable);
   return disposable;
 }
@@ -114,22 +173,26 @@ export interface RawDiagnostic {
   code: DiagCode;
 }
 
-export function analyzeText(text: string, projectApiLevel?: number): RawDiagnostic[] {
+export function analyzeText(text: string, projectApiLevel?: number, context: AnalyzeContext = {}): RawDiagnostic[] {
   const lines = text.split('\n');
   const diags: RawDiagnostic[] = [];
 
   diags.push(...checkStrictTypes(lines));
   diags.push(...checkStateManagement(lines, text));
+  diags.push(...checkReusableV2RepeatTemplateUsage(text));
+  diags.push(...checkThemeControlPlacement(text));
+  diags.push(...checkCustomThemeShells(text));
+  diags.push(...checkWithThemeDarkResources(text, context));
   diags.push(...checkPerformanceAntiPatterns(lines, text));
   if (projectApiLevel) {
-    diags.push(...checkApiLevelUsage(lines, projectApiLevel));
+    diags.push(...checkApiLevelUsage(lines, text, projectApiLevel));
   }
 
   return diags;
 }
 
-function analyzeDocument(doc: vscode.TextDocument, projectApiLevel?: number): vscode.Diagnostic[] {
-  const raw = analyzeText(doc.getText(), projectApiLevel);
+function analyzeDocument(doc: vscode.TextDocument, projectApiLevel?: number, context: AnalyzeContext = {}): vscode.Diagnostic[] {
+  const raw = analyzeText(doc.getText(), projectApiLevel, context);
   return raw.map((r) => {
     const range = new vscode.Range(r.line, r.colStart, r.line, r.colEnd);
     const d = new vscode.Diagnostic(range, r.message, r.severity);
@@ -284,6 +347,62 @@ function checkStateManagement(lines: string[], text: string): RawDiagnostic[] {
   return diags;
 }
 
+function checkReusableV2RepeatTemplateUsage(text: string): RawDiagnostic[] {
+  return findReusableV2RepeatTemplateUsages(text).map((usage) => ({
+    line: usage.line,
+    colStart: usage.colStart,
+    colEnd: usage.colEnd,
+    message: `@ReusableV2 组件 \`${usage.componentName}\` 不支持直接用于 Repeat.template 子组件。请改用普通 @ComponentV2 子组件，或将复用逻辑移出 Repeat.template。`,
+    severity: vscode.DiagnosticSeverity.Warning,
+    code: DIAG_CODES.REUSABLE_V2_REPEAT_TEMPLATE,
+  }));
+}
+
+function checkThemeControlPlacement(text: string): RawDiagnostic[] {
+  const diags: RawDiagnostic[] = [];
+
+  for (const block of extractBuildBlocks(text)) {
+    for (const usage of findThemeControlSetDefaultThemeUsages(block.content)) {
+      diags.push({
+        line: block.startLine + usage.line,
+        colStart: usage.colStart,
+        colEnd: usage.colEnd,
+        message: 'ThemeControl.setDefaultTheme() 不应放在 build() 中。官方建议在页面首次构建前调用，或在 UIAbility 的 onWindowStageCreate/loadContent 回调中设置默认主题。',
+        severity: vscode.DiagnosticSeverity.Warning,
+        code: DIAG_CODES.THEMECONTROL_IN_BUILD,
+      });
+    }
+  }
+
+  return diags;
+}
+
+function checkCustomThemeShells(text: string): RawDiagnostic[] {
+  return findCustomThemeShellUsages(text).map((usage) => ({
+    line: usage.line,
+    colStart: usage.colStart,
+    colEnd: usage.colEnd,
+    message: `CustomTheme 类 \`${usage.className}\` 当前没有检测到 colors 覆写。若将它传给 WithTheme / ThemeControl.setDefaultTheme()，组件默认配色可能不会发生明显变化。`,
+    severity: vscode.DiagnosticSeverity.Information,
+    code: DIAG_CODES.CUSTOM_THEME_NO_COLORS,
+  }));
+}
+
+function checkWithThemeDarkResources(text: string, context: AnalyzeContext): RawDiagnostic[] {
+  if (context.hasDarkThemeResource !== false) {
+    return [];
+  }
+
+  return findWithThemeColorModeUsages(text).map((usage) => ({
+    line: usage.line,
+    colStart: usage.colStart,
+    colEnd: usage.colEnd,
+    message: '检测到 WithTheme({ colorMode: ... })，但当前工程还没有 dark.json 资源文件。根据官方文档，缺少 dark.json 时局部深浅色模式不会生效。',
+    severity: vscode.DiagnosticSeverity.Warning,
+    code: DIAG_CODES.WITH_THEME_DARK_RESOURCE,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Rule 3: Performance anti-patterns
 // ---------------------------------------------------------------------------
@@ -303,7 +422,7 @@ function checkPerformanceAntiPatterns(lines: string[], text: string): RawDiagnos
         line: i,
         colStart: forEachMatch.index,
         colEnd: forEachMatch.index + 'ForEach'.length,
-        message: 'ForEach 会一次性渲染所有子项。当列表数据较多时，请使用 LazyForEach 实现按需渲染以提升性能。',
+        message: 'ForEach 会一次性渲染所有子项。当列表数据较多时，请使用 LazyForEach 或 Repeat 提升渲染性能。',
         severity: vscode.DiagnosticSeverity.Information,
         code: DIAG_CODES.FOREACH_PERF,
       });
@@ -340,7 +459,7 @@ function checkPerformanceAntiPatterns(lines: string[], text: string): RawDiagnos
 // Rule 4: API level usage — warn when using features above project target
 // ---------------------------------------------------------------------------
 
-function checkApiLevelUsage(lines: string[], apiLevel: number): RawDiagnostic[] {
+function checkApiLevelUsage(lines: string[], text: string, apiLevel: number): RawDiagnostic[] {
   const diags: RawDiagnostic[] = [];
 
   for (const dec of getDecorators()) {
@@ -382,6 +501,30 @@ function checkApiLevelUsage(lines: string[], apiLevel: number): RawDiagnostic[] 
           code: DIAG_CODES.API_LEVEL,
         });
       }
+    }
+  }
+
+  if (apiLevel < 16 && hasComponentV2Decorator(text)) {
+    for (const usage of findWithThemeUsages(text)) {
+      diags.push({
+        line: usage.line,
+        colStart: usage.colStart,
+        colEnd: usage.colEnd,
+        message: `WithTheme 在 V2 状态管理组件中需要 API 16+，当前项目目标为 API ${apiLevel}。如需兼容更低版本，请改用 V1 组件中的主题换肤方案或升级目标 SDK。`,
+        severity: vscode.DiagnosticSeverity.Warning,
+        code: DIAG_CODES.API_LEVEL,
+      });
+    }
+
+    for (const usage of findOnWillApplyThemeUsages(text)) {
+      diags.push({
+        line: usage.line,
+        colStart: usage.colStart,
+        colEnd: usage.colEnd,
+        message: `onWillApplyTheme 在 V2 状态管理组件中需要 API 16+，当前项目目标为 API ${apiLevel}。如需兼容更低版本，请改用 V1 组件主题生命周期或升级目标 SDK。`,
+        severity: vscode.DiagnosticSeverity.Warning,
+        code: DIAG_CODES.API_LEVEL,
+      });
     }
   }
 

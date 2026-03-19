@@ -32,6 +32,11 @@ describe('apiCompatChecker data', () => {
       const sampleCode = 'const obs = UIUtils.makeObserved(rawObj);';
       expect(api14Apis.some(a => sampleCode.includes(a))).toBe(true);
     });
+
+    it('should detect API 18+ @ReusableV2 feature', () => {
+      const sampleCode = '@ReusableV2\n@ComponentV2\nstruct RowItem {}';
+      expect(sampleCode.includes('@ReusableV2')).toBe(true);
+    });
   });
 
   describe('V1/V2 mixing detection', () => {

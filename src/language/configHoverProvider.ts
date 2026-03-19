@@ -29,6 +29,7 @@ const CONFIG_KEY_DOCS: Record<string, Record<string, string>> = {
     description: '模块描述，可使用 $string 资源引用。\n\nModule description.',
     mainElement: '模块的入口 Ability 或 ExtensionAbility 名称。\n\nMain ability name of this module.',
     deviceTypes: '支持的设备类型列表：phone, tablet, 2in1, tv, wearable, car。\n\nSupported device types.',
+    routerMap: '系统路由表配置文件路径（通常指向 src/main/resources/base/profile/route_map.json），用于 Navigation + NavPathStack 的命名路由。\n\nSystem route map file path, typically route_map.json for Navigation + NavPathStack named routes.',
     deliveryWithInstall: '是否随应用安装时一起下载。entry 必须为 true。\n\nWhether to deliver with initial install.',
     installationFree: '是否支持免安装。feature 模块可设置为 true 以启用原子化服务。\n\nEnable installation-free (atomic service).',
     pages: '页面配置文件路径（通常指向 src/main/resources/base/profile/main_pages.json）。\n\nPage routing configuration file path.',

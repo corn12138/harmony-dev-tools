@@ -29,6 +29,34 @@ const OFFICIAL_SHORTCUTS: DocItem[] = [
   },
 ];
 
+const CURRENT_ARKUI_SHORTCUTS: DocItem[] = [
+  {
+    label: 'ArkUI Repeat / 差量复用渲染',
+    detail: '官方 Repeat 指南：相较 ForEach，在部分更新场景有更好的渲染性能',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/f013f0d3312a247aac9c4eb1e6f29d636eafbeed/en/application-dev/quick-start/arkts-new-rendering-control-repeat.md',
+  },
+  {
+    label: 'Component Freeze / freezeWhenInactive',
+    detail: '官方组件冻结指南：用于页面路由、Tabs、LazyForEach、Navigation 等场景',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/1a3ce694233182c1e66fa10dcdcede2ad5592661/en/application-dev/quick-start/arkts-custom-components-freeze.md',
+  },
+  {
+    label: 'WithTheme / 应用内主题换肤',
+    detail: '官方 WithTheme 组件文档：局部主题、深浅色模式和自定义配色入口',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/reference/apis-arkui/arkui-ts/ts-container-with-theme.md',
+  },
+  {
+    label: 'ThemeControl / 应用级主题设置',
+    detail: '官方 ThemeControl 文档：应用级 setDefaultTheme 与主题对象接口',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/14c2fb4ddf051bda012f7c0fbfad196192d8c934/zh-cn/application-dev/reference/apis-arkui/js-apis-arkui-theme.md',
+  },
+  {
+    label: 'State Management V2 Overview / 状态管理 V2 概览',
+    detail: '官方对 V1/V2 差异、兼容关系、withTheme API 16 支持等的最新说明',
+    docUrl: 'https://gitee.com/openharmony/docs/blob/2625097b75653e461804aafe08ffc780c69d9f91/zh-cn/application-dev/quick-start/arkts-state-management-overview.md',
+  },
+];
+
 export async function openDocs(prefill?: string): Promise<void> {
   const items = buildDocItems();
 
@@ -58,6 +86,8 @@ function buildDocItems(): DocItem[] {
 
   items.push({ label: '官方入口 / Official Shortcuts', kind: vscode.QuickPickItemKind.Separator, docUrl: '' });
   items.push(...OFFICIAL_SHORTCUTS);
+  items.push({ label: '当前 ArkUI 主题 / Current ArkUI Topics', kind: vscode.QuickPickItemKind.Separator, docUrl: '' });
+  items.push(...CURRENT_ARKUI_SHORTCUTS);
 
   const decsByModel = new Map<string, DecoratorMeta[]>();
   for (const d of decorators) {

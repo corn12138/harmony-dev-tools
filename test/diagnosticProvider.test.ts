@@ -120,6 +120,78 @@ describe('diagnosticProvider — analyzeText', () => {
       const diags = analyzeText(code);
       expect(diags.filter((d) => d.code === DIAG_CODES.LINK_IN_V2)).toHaveLength(0);
     });
+
+    it('should warn when @ReusableV2 component is used directly inside Repeat.template', () => {
+      const code = [
+        '@ComponentV2',
+        '@ReusableV2',
+        'struct ReusableCard {',
+        '  build() {',
+        '    Text("item")',
+        '  }',
+        '}',
+        '@ComponentV2',
+        'struct HostPage {',
+        '  build() {',
+        '    Repeat<string>(this.items)',
+        '      .each((item) => item)',
+        '      .template("default", (item: string) => {',
+        '        ReusableCard()',
+        '      })',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      const reusableDiag = diags.find((d) => d.code === DIAG_CODES.REUSABLE_V2_REPEAT_TEMPLATE);
+      expect(reusableDiag).toBeDefined();
+      expect(reusableDiag!.message).toContain('Repeat.template');
+      expect(reusableDiag!.message).toContain('ReusableCard');
+    });
+
+    it('should NOT flag normal @ComponentV2 child usage inside Repeat.template', () => {
+      const code = [
+        '@ComponentV2',
+        'struct PlainCard {',
+        '  build() {',
+        '    Text("item")',
+        '  }',
+        '}',
+        '@ComponentV2',
+        'struct HostPage {',
+        '  build() {',
+        '    Repeat<string>(this.items)',
+        '      .each((item) => item)',
+        '      .template("default", (item: string) => {',
+        '        PlainCard()',
+        '      })',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      expect(diags.filter((d) => d.code === DIAG_CODES.REUSABLE_V2_REPEAT_TEMPLATE)).toHaveLength(0);
+    });
+
+    it('should NOT flag @ReusableV2 component usage outside Repeat.template', () => {
+      const code = [
+        '@ComponentV2',
+        '@ReusableV2',
+        'struct ReusableCard {',
+        '  build() {',
+        '    Text("item")',
+        '  }',
+        '}',
+        '@ComponentV2',
+        'struct HostPage {',
+        '  build() {',
+        '    Column() {',
+        '      ReusableCard()',
+        '    }',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      expect(diags.filter((d) => d.code === DIAG_CODES.REUSABLE_V2_REPEAT_TEMPLATE)).toHaveLength(0);
+    });
   });
 
   // -------------------------------------------------------------------
@@ -193,6 +265,218 @@ describe('diagnosticProvider — analyzeText', () => {
       expect(heavy!.colStart).toBe(4);
       expect(heavy!.colEnd).toBe(16);
     });
+
+    it('should warn when ThemeControl.setDefaultTheme is called inside build()', () => {
+      const code = [
+        '@Entry',
+        '@Component',
+        'struct Page {',
+        '  build() {',
+        '    ThemeControl.setDefaultTheme(AppTheme)',
+        '    Column() {}',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      const themeDiag = diags.find((d) => d.code === DIAG_CODES.THEMECONTROL_IN_BUILD);
+      expect(themeDiag).toBeDefined();
+      expect(themeDiag!.message).toContain('onWindowStageCreate');
+    });
+
+    it('should not warn when ThemeControl.setDefaultTheme is outside build()', () => {
+      const code = [
+        'ThemeControl.setDefaultTheme(AppTheme)',
+        '@Entry',
+        '@Component',
+        'struct Page {',
+        '  build() {',
+        '    Column() {}',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      expect(diags.filter((d) => d.code === DIAG_CODES.THEMECONTROL_IN_BUILD)).toHaveLength(0);
+    });
+
+    it('should inform when an instantiated CustomTheme class has no colors override', () => {
+      const code = [
+        'class EmptyTheme implements CustomTheme {',
+        '}',
+        '@Entry',
+        '@Component',
+        'struct Page {',
+        '  @State customTheme: CustomTheme = new EmptyTheme();',
+        '  build() {',
+        '    WithTheme({ theme: this.customTheme }) {',
+        '      Column() {}',
+        '    }',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      const customThemeDiag = diags.find((d) => d.code === DIAG_CODES.CUSTOM_THEME_NO_COLORS);
+      expect(customThemeDiag).toBeDefined();
+      expect(customThemeDiag!.message).toContain('colors');
+      expect(customThemeDiag!.message).toContain('EmptyTheme');
+    });
+
+    it('should not inform when CustomTheme overrides colors', () => {
+      const code = [
+        'class AppTheme implements CustomTheme {',
+        '  public colors: AppColors = new AppColors();',
+        '}',
+        '@Entry',
+        '@Component',
+        'struct Page {',
+        '  @State customTheme: CustomTheme = new AppTheme();',
+        '  build() {',
+        '    WithTheme({ theme: this.customTheme }) {',
+        '      Column() {}',
+        '    }',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      expect(diags.filter((d) => d.code === DIAG_CODES.CUSTOM_THEME_NO_COLORS)).toHaveLength(0);
+    });
+
+    it('should not inform when empty CustomTheme class is never instantiated', () => {
+      const code = [
+        'class EmptyTheme implements CustomTheme {',
+        '}',
+        '@Entry',
+        '@Component',
+        'struct Page {',
+        '  build() {',
+        '    Column() {}',
+        '  }',
+        '}',
+      ].join('\n');
+      const diags = analyzeText(code);
+      expect(diags.filter((d) => d.code === DIAG_CODES.CUSTOM_THEME_NO_COLORS)).toHaveLength(0);
+    });
+  });
+});
+
+describe('api-level compatibility diagnostics', () => {
+  it('should warn when WithTheme is used inside a V2 component below API 16', () => {
+    const code = [
+      '@ComponentV2',
+      'struct ThemedPage {',
+      '  build() {',
+      '    WithTheme({ colorMode: ThemeColorMode.SYSTEM }) {',
+      '      Text("hello")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, 15);
+    expect(diags.some((d) => d.code === DIAG_CODES.API_LEVEL && d.message.includes('WithTheme') && d.message.includes('API 16+'))).toBe(true);
+  });
+
+  it('should not warn when WithTheme is used inside a V2 component on API 16+', () => {
+    const code = [
+      '@ComponentV2',
+      'struct ThemedPage {',
+      '  build() {',
+      '    WithTheme({ colorMode: ThemeColorMode.SYSTEM }) {',
+      '      Text("hello")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, 16);
+    expect(diags.some((d) => d.code === DIAG_CODES.API_LEVEL && d.message.includes('WithTheme'))).toBe(false);
+  });
+
+  it('should not warn when WithTheme is used in a V1 component below API 16', () => {
+    const code = [
+      '@Component',
+      'struct ThemedPage {',
+      '  build() {',
+      '    WithTheme({ colorMode: ThemeColorMode.SYSTEM }) {',
+      '      Text("hello")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, 15);
+    expect(diags.some((d) => d.code === DIAG_CODES.API_LEVEL && d.message.includes('WithTheme') && d.message.includes('API 16+'))).toBe(false);
+  });
+
+  it('should warn when onWillApplyTheme is used inside a V2 component below API 16', () => {
+    const code = [
+      '@ComponentV2',
+      'struct ThemedPage {',
+      '  onWillApplyTheme(theme: Theme) {',
+      '    console.info(theme)',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, 15);
+    expect(diags.some((d) => d.code === DIAG_CODES.API_LEVEL && d.message.includes('onWillApplyTheme') && d.message.includes('API 16+'))).toBe(true);
+  });
+
+  it('should not warn when onWillApplyTheme is used inside a V2 component on API 16+', () => {
+    const code = [
+      '@ComponentV2',
+      'struct ThemedPage {',
+      '  onWillApplyTheme(theme: Theme) {',
+      '    console.info(theme)',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, 16);
+    expect(diags.some((d) => d.code === DIAG_CODES.API_LEVEL && d.message.includes('onWillApplyTheme'))).toBe(false);
+  });
+
+  it('should warn when WithTheme colorMode is used without dark.json resources', () => {
+    const code = [
+      '@Entry',
+      '@Component',
+      'struct ThemedPage {',
+      '  build() {',
+      '    WithTheme({ colorMode: ThemeColorMode.DARK }) {',
+      '      Text("hello")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, undefined, { hasDarkThemeResource: false });
+    expect(diags.some((d) => d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE && d.message.includes('dark.json'))).toBe(true);
+  });
+
+  it('should not warn when WithTheme colorMode is used and dark.json resources exist', () => {
+    const code = [
+      '@Entry',
+      '@Component',
+      'struct ThemedPage {',
+      '  build() {',
+      '    WithTheme({ colorMode: ThemeColorMode.DARK }) {',
+      '      Text("hello")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, undefined, { hasDarkThemeResource: true });
+    expect(diags.filter((d) => d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE)).toHaveLength(0);
+  });
+
+  it('should not warn about dark.json when WithTheme only sets theme', () => {
+    const code = [
+      '@Entry',
+      '@Component',
+      'struct ThemedPage {',
+      '  @State customTheme: CustomTheme = new AppTheme();',
+      '  build() {',
+      '    WithTheme({ theme: this.customTheme }) {',
+      '      Text("hello")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, undefined, { hasDarkThemeResource: false });
+    expect(diags.filter((d) => d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE)).toHaveLength(0);
   });
 });
 

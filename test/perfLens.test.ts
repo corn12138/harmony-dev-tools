@@ -20,13 +20,22 @@ describe('perfLens — analyzeBuildBlock', () => {
     const code = 'build() {\n  List() {\n    LazyForEach(this.source, (item) => {\n      ListItem() { Text(item.name) }\n    })\n  }\n}';
     const stats = analyzeBuildBlock(code);
     expect(stats.hasLazyForEach).toBe(true);
+    expect(stats.hasRepeat).toBe(false);
   });
 
-  it('should detect both ForEach and LazyForEach in same block', () => {
-    const code = 'build() {\n  ForEach(a, () => {})\n  LazyForEach(b, () => {})\n}';
+  it('should detect Repeat usage', () => {
+    const code = 'build() {\n  List() {\n    Repeat<string>(this.items)\n      .each((item) => {\n        ListItem() { Text(item) }\n      })\n  }\n}';
+    const stats = analyzeBuildBlock(code);
+    expect(stats.hasRepeat).toBe(true);
+    expect(stats.hasForEach).toBe(false);
+  });
+
+  it('should detect mixed list rendering strategies in same block', () => {
+    const code = 'build() {\n  ForEach(a, () => {})\n  LazyForEach(b, () => {})\n  Repeat<string>(c)\n}';
     const stats = analyzeBuildBlock(code);
     expect(stats.hasForEach).toBe(true);
     expect(stats.hasLazyForEach).toBe(true);
+    expect(stats.hasRepeat).toBe(true);
   });
 
   it('should calculate max brace depth', () => {
@@ -41,6 +50,7 @@ describe('perfLens — analyzeBuildBlock', () => {
     expect(stats.componentCount).toBe(0);
     expect(stats.hasForEach).toBe(false);
     expect(stats.hasLazyForEach).toBe(false);
+    expect(stats.hasRepeat).toBe(false);
   });
 
   it('should skip commented components', () => {

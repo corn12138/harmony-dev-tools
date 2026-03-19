@@ -5,12 +5,12 @@ import * as vscode from 'vscode';
 //
 // Shows inline hints on:
 //   1. build() methods — component tree depth + child count
-//   2. ForEach / LazyForEach — rendering strategy & tips
+//   2. ForEach / LazyForEach / Repeat — rendering strategy & tips
 //   3. @State / @Local / @Trace — state variable count per struct
 // ---------------------------------------------------------------------------
 
 const COMPONENT_RE = /\b([A-Z]\w+)\s*\(/g;
-const FOREACH_RE = /\b(ForEach|LazyForEach)\s*\(/;
+const LIST_RENDER_RE = /\b(ForEach|LazyForEach|Repeat)(?:<[^>]+>)?\s*\(/;
 const BUILD_RE = /\bbuild\s*\(\s*\)\s*\{/;
 const STRUCT_RE = /\bstruct\s+(\w+)/;
 const STATE_DECS = ['@State', '@Local', '@Trace', '@Prop', '@Link', '@Param'];
@@ -33,6 +33,7 @@ export interface BuildStats {
   maxDepth: number;
   hasForEach: boolean;
   hasLazyForEach: boolean;
+  hasRepeat: boolean;
 }
 
 export function analyzeBuildBlock(text: string): BuildStats {
@@ -41,6 +42,7 @@ export function analyzeBuildBlock(text: string): BuildStats {
   let depth = 0;
   let hasForEach = false;
   let hasLazyForEach = false;
+  let hasRepeat = false;
 
   for (const line of text.split('\n')) {
     const trimmed = line.trim();
@@ -56,9 +58,10 @@ export function analyzeBuildBlock(text: string): BuildStats {
 
     if (/\bForEach\s*\(/.test(trimmed)) hasForEach = true;
     if (/\bLazyForEach\s*\(/.test(trimmed)) hasLazyForEach = true;
+    if (/\bRepeat(?:<[^>]+>)?\s*\(/.test(trimmed)) hasRepeat = true;
   }
 
-  return { componentCount, maxDepth, hasForEach, hasLazyForEach };
+  return { componentCount, maxDepth, hasForEach, hasLazyForEach, hasRepeat };
 }
 
 export function countStateVariables(structBlock: string): number {
@@ -90,10 +93,12 @@ class PerfCodeLensProvider implements vscode.CodeLensProvider {
           `$(symbol-class) ${stats.componentCount} components`,
           `depth ${stats.maxDepth}`,
         ];
-        if (stats.hasForEach && !stats.hasLazyForEach) {
-          parts.push('$(warning) ForEach — consider LazyForEach for large lists');
+        if (stats.hasRepeat) {
+          parts.push('$(check) Repeat');
         } else if (stats.hasLazyForEach) {
           parts.push('$(check) LazyForEach');
+        } else if (stats.hasForEach) {
+          parts.push('$(warning) ForEach — consider Repeat or LazyForEach for larger lists');
         }
 
         lenses.push(new vscode.CodeLens(
@@ -102,13 +107,15 @@ class PerfCodeLensProvider implements vscode.CodeLensProvider {
         ));
       }
 
-      // ForEach / LazyForEach
-      const feMatch = line.match(FOREACH_RE);
+      // ForEach / LazyForEach / Repeat
+      const feMatch = line.match(LIST_RENDER_RE);
       if (feMatch) {
-        const isLazy = feMatch[1] === 'LazyForEach';
-        const tip = isLazy
-          ? '$(check) LazyForEach：按需渲染，适合长列表'
-          : '$(warning) ForEach：全量渲染，列表项 > 20 时建议切换到 LazyForEach';
+        const strategy = feMatch[1];
+        const tip = strategy === 'Repeat'
+          ? '$(check) Repeat：差量更新更友好，适合数组型列表和复用场景'
+          : strategy === 'LazyForEach'
+            ? '$(check) LazyForEach：按需渲染，适合长列表'
+            : '$(warning) ForEach：全量渲染，列表项较多时建议切换到 Repeat 或 LazyForEach';
         lenses.push(new vscode.CodeLens(
           new vscode.Range(i, 0, i, line.length),
           { title: tip, command: '' },

@@ -1,22 +1,11 @@
 import * as vscode from 'vscode';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
-import { listConnectedDevices } from './devices';
+import { ensureConnectedDevice, explainDeviceConnectionIssue, getConnectedDeviceState } from './devices';
 import { findBuiltHapFiles, readBundleName, readEntryAbility } from '../utils/projectMetadata';
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 
 export async function runOnDevice(): Promise<void> {
-  const devices = await listConnectedDevices();
-  if (devices.length === 0) {
-    vscode.window.showWarningMessage('No HarmonyOS devices connected. Please connect a device via USB or WiFi.');
-    return;
-  }
-
-  const selected = devices.length === 1
-    ? devices[0]
-    : await vscode.window.showQuickPick(
-        devices.map((d) => ({ label: d.id, description: d.status, device: d })),
-        { placeHolder: 'Select a device' }
-      ).then((pick) => pick?.device);
+  const selected = await ensureConnectedDevice({ placeHolder: 'Select a device to run on' });
 
   if (!selected) return;
 
@@ -74,8 +63,15 @@ export async function runOnDevice(): Promise<void> {
 }
 
 export async function refreshDevices(): Promise<void> {
-  const devices = await listConnectedDevices();
-  vscode.window.showInformationMessage(`Found ${devices.length} device(s): ${devices.map((d) => d.id).join(', ') || 'none'}`);
+  const state = await getConnectedDeviceState();
+  if (state.error) {
+    await explainDeviceConnectionIssue(state.error);
+    return;
+  }
+
+  vscode.window.showInformationMessage(
+    `Found ${state.devices.length} device(s): ${state.devices.map((device) => device.id).join(', ') || 'none'}`,
+  );
 }
 
 export async function installHap(): Promise<void> {
@@ -87,22 +83,7 @@ export async function installHap(): Promise<void> {
   });
   if (!hapFile?.length) return;
 
-  const devices = await listConnectedDevices();
-  if (devices.length === 0) {
-    vscode.window.showWarningMessage('No devices connected.');
-    return;
-  }
-
-  const selected = devices.length === 1
-    ? devices[0]
-    : await vscode.window.showQuickPick(
-        devices.map((device) => ({
-          label: device.name,
-          description: device.id,
-          device,
-        })),
-        { placeHolder: 'Select a device' }
-      ).then((pick) => pick?.device);
+  const selected = await ensureConnectedDevice({ placeHolder: 'Select a device to install the HAP on' });
 
   if (!selected) return;
 

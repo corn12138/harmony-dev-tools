@@ -3,7 +3,7 @@ import { resolveHdcPath } from '../utils/config';
 import { buildHvigorCommand } from '../utils/hvigor';
 import { readBundleName, readEntryAbility } from '../utils/projectMetadata';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
-import { listConnectedDevices, type ConnectedDevice } from '../device/devices';
+import { ensureConnectedDevice, type ConnectedDevice } from '../device/devices';
 import { buildHdcTargetArgs, buildHdcTerminalCommand, rawTerminalArg } from '../utils/hdc';
 
 let buildTerminal: vscode.Terminal | undefined;
@@ -145,27 +145,7 @@ function createUtilityTerminal(
 }
 
 async function selectDevice(): Promise<ConnectedDevice | undefined> {
-  const devices = await listConnectedDevices();
-  if (devices.length === 0) {
-    vscode.window.showWarningMessage('No HarmonyOS devices connected. Please connect a device first.');
-    return undefined;
-  }
-
-  if (devices.length === 1) {
-    return devices[0];
-  }
-
-  const pick = await vscode.window.showQuickPick(
-    devices.map((device) => ({
-      label: device.name,
-      description: device.id,
-      detail: device.status,
-      device,
-    })),
-    { placeHolder: 'Select a device' },
-  );
-
-  return pick?.device;
+  return ensureConnectedDevice({ placeHolder: 'Select a device for terminal run' });
 }
 
 function buildLaunchCommand(options: {

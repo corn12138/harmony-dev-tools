@@ -1,19 +1,38 @@
 import * as vscode from 'vscode';
 import { UINode, dumpUITree, captureScreenshot, findSourceLocation } from './uiInspector';
+import { ensureConnectedDevice, getActiveDeviceId, setActiveDeviceId } from '../device/devices';
 
 let panel: vscode.WebviewPanel | undefined;
 let liveRefreshTimer: ReturnType<typeof setInterval> | undefined;
 let isLiveMode = false;
+let currentDeviceId: string | undefined;
 
-export async function openUIInspector(): Promise<void> {
+export async function openUIInspector(deviceId?: string): Promise<void> {
+  if (!deviceId) {
+    const preferredId = getActiveDeviceId() ?? currentDeviceId;
+    const device = await ensureConnectedDevice({
+      placeHolder: 'Select a device to inspect',
+      preferredId,
+    });
+    if (!device) {
+      return;
+    }
+    deviceId = device.id;
+  }
+
+  currentDeviceId = deviceId;
+  setActiveDeviceId(deviceId);
+
   if (panel) {
+    panel.title = `UI Inspector: ${currentDeviceId}`;
     panel.reveal(vscode.ViewColumn.Beside);
+    await refreshInspector();
     return;
   }
 
   panel = vscode.window.createWebviewPanel(
     'harmonyUIInspector',
-    'UI Inspector',
+    `UI Inspector: ${currentDeviceId}`,
     vscode.ViewColumn.Beside,
     { enableScripts: true, retainContextWhenHidden: true }
   );
@@ -21,6 +40,7 @@ export async function openUIInspector(): Promise<void> {
   panel.onDidDispose(() => {
     panel = undefined;
     stopLiveRefresh();
+    currentDeviceId = undefined;
   });
 
   // Handle messages from WebView
@@ -58,8 +78,8 @@ function startLiveRefresh(): void {
     if (!panel) { stopLiveRefresh(); return; }
     // Only refresh screenshot + tree data, post message to update without full HTML rebuild
     const [tree, screenshot] = await Promise.all([
-      dumpUITree(),
-      captureScreenshot(),
+      dumpUITree(currentDeviceId),
+      captureScreenshot(currentDeviceId),
     ]);
     if (panel) {
       panel.webview.postMessage({ command: 'liveUpdate', tree, screenshot });
@@ -83,8 +103,8 @@ async function refreshInspector(): Promise<void> {
   panel.webview.html = getLoadingHtml();
 
   const [tree, screenshot] = await Promise.all([
-    dumpUITree(),
-    captureScreenshot(),
+    dumpUITree(currentDeviceId),
+    captureScreenshot(currentDeviceId),
   ]);
 
   panel.webview.html = getInspectorHtml(tree, screenshot);

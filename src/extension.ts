@@ -157,6 +157,16 @@ function registerLazyLanguageFeatures(context: vscode.ExtensionContext): void {
 // ---- Layer 1.5: TreeView panels & Task Provider ----
 
 function registerTreeViewsAndTasks(context: vscode.ExtensionContext): void {
+  import('./home/quickActionsTreeView').then(({ QuickActionsTreeProvider }) => {
+    const quickActionsProvider = new QuickActionsTreeProvider();
+    context.subscriptions.push(quickActionsProvider);
+    const treeView = vscode.window.createTreeView('harmony.quickActionsView', {
+      treeDataProvider: quickActionsProvider,
+      showCollapseAll: false,
+    });
+    context.subscriptions.push(treeView);
+  });
+
   // Project Files TreeView — uses getCurrentProjectFileIndex(), refreshes on project:indexUpdated
   import('./project/projectFilesTreeView').then(({ ProjectFilesTreeProvider }) => {
     const projectFilesProvider = new ProjectFilesTreeProvider(eventBus);
@@ -176,18 +186,40 @@ function registerTreeViewsAndTasks(context: vscode.ExtensionContext): void {
   });
 
   // Device TreeView — lazy import, register immediately so the panel exists
-  import('./device/treeView').then(({ DeviceTreeProvider }) => {
-    const deviceProvider = new DeviceTreeProvider(eventBus);
-    context.subscriptions.push(deviceProvider);
-    const treeView = vscode.window.createTreeView('harmony.deviceView', {
-      treeDataProvider: deviceProvider,
-    });
-    context.subscriptions.push(treeView);
+  let deviceProviderPromise:
+    | Promise<import('./device/treeView').DeviceTreeProvider>
+    | undefined;
 
-    // Wire refresh command to the tree provider
-    context.subscriptions.push(
-      vscode.commands.registerCommand(COMMANDS.VIEW_DEVICES, () => deviceProvider.refresh())
-    );
+  const ensureDeviceProvider = async () => {
+    if (!deviceProviderPromise) {
+      deviceProviderPromise = import('./device/treeView').then(({ DeviceTreeProvider }) => {
+        const deviceProvider = new DeviceTreeProvider(eventBus);
+        context.subscriptions.push(deviceProvider);
+        const treeView = vscode.window.createTreeView('harmony.deviceView', {
+          treeDataProvider: deviceProvider,
+        });
+        context.subscriptions.push(treeView);
+        return deviceProvider;
+      });
+    }
+
+    return deviceProviderPromise;
+  };
+
+  void ensureDeviceProvider();
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMANDS.VIEW_DEVICES, async () => {
+      const deviceProvider = await ensureDeviceProvider();
+      await deviceProvider.refresh();
+    })
+  );
+
+  import('./device/devices').then(({ createDeviceStatusBar }) => {
+    createDeviceStatusBar(context);
+  });
+  import('./home/controlCenter').then(({ createControlCenterStatusBar }) => {
+    createControlCenterStatusBar(context);
   });
 
   // Hvigor Task Provider
@@ -234,6 +266,15 @@ function registerDxEnhancements(context: vscode.ExtensionContext): void {
     });
   }
 
+  if (config.get('enableProjectConfigDiagnostics', true)) {
+    import('./project/projectConfigDiagnostics').then(({ createProjectConfigDiagnosticProvider }) => {
+      createProjectConfigDiagnosticProvider(context);
+    });
+    import('./project/projectConfigCodeActions').then(({ createProjectConfigCodeActions }) => {
+      createProjectConfigCodeActions(context);
+    });
+  }
+
   // Performance insight CodeLens on build() / ForEach / struct
   if (config.get('enablePerfLens', true)) {
     import('./language/perfLens').then(({ createPerfLensProvider }) => {
@@ -257,7 +298,7 @@ function registerDxEnhancements(context: vscode.ExtensionContext): void {
 // ---- Layer 2: Command-triggered features ----
 
 function registerLazyCommands(context: vscode.ExtensionContext): void {
-  const lazyCommand = (commandId: string, handler: () => Promise<void>) => {
+  const lazyCommand = (commandId: string, handler: (...args: any[]) => Promise<void>) => {
     context.subscriptions.push(
       vscode.commands.registerCommand(commandId, handler)
     );
@@ -266,6 +307,11 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
   lazyCommand(COMMANDS.CREATE_PROJECT, async () => {
     const { runProjectWizard } = await import('./project/wizard');
     await runProjectWizard();
+  });
+
+  lazyCommand(COMMANDS.OPEN_CONTROL_CENTER, async () => {
+    const { openControlCenter } = await import('./home/controlCenter');
+    await openControlCenter();
   });
 
   lazyCommand(COMMANDS.BUILD_HAP, async () => {
@@ -285,14 +331,27 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
 
   // VIEW_DEVICES is registered in registerTreeViewsAndTasks
 
+  lazyCommand(COMMANDS.SELECT_DEVICE, async () => {
+    const { promptAndSelectDevice } = await import('./device/devices');
+    await promptAndSelectDevice();
+  });
+
+  lazyCommand(COMMANDS.USE_DEVICE, async (commandArg?: unknown) => {
+    const [{ selectDeviceById }, { extractDeviceIdFromCommandArg }] = await Promise.all([
+      import('./device/devices'),
+      import('./device/commandArgs'),
+    ]);
+    await selectDeviceById(extractDeviceIdFromCommandArg(commandArg));
+  });
+
   lazyCommand(COMMANDS.INSTALL_HAP, async () => {
     const { installHap } = await import('./device/manager');
     await installHap();
   });
 
-  lazyCommand(COMMANDS.VIEW_LOGS, async () => {
+  lazyCommand(COMMANDS.VIEW_LOGS, async (commandArg?: unknown) => {
     const { viewLogs } = await import('./device/logViewer');
-    await viewLogs();
+    await viewLogs(commandArg);
   });
 
   lazyCommand(COMMANDS.PREVIEW_COMPONENT, async () => {
@@ -335,9 +394,12 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
     await openDocs();
   });
 
-  lazyCommand(COMMANDS.UI_INSPECTOR, async () => {
-    const { openUIInspector } = await import('./debug/inspectorPanel');
-    await openUIInspector();
+  lazyCommand(COMMANDS.UI_INSPECTOR, async (commandArg?: unknown) => {
+    const [{ openUIInspector }, { extractDeviceIdFromCommandArg }] = await Promise.all([
+      import('./debug/inspectorPanel'),
+      import('./device/commandArgs'),
+    ]);
+    await openUIInspector(extractDeviceIdFromCommandArg(commandArg));
   });
 
   lazyCommand(COMMANDS.BUILD_AND_RUN, async () => {
@@ -370,19 +432,30 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
     await migrateV1ToV2();
   });
 
+  lazyCommand(COMMANDS.MIGRATE_BUILD_PROFILE, async (uri?: vscode.Uri) => {
+    const { migrateBuildProfile } = await import('./project/buildProfileMigration');
+    await migrateBuildProfile(uri);
+  });
+
   lazyCommand(COMMANDS.CHECK_API_COMPAT, async () => {
     const { checkApiCompatibility } = await import('./tools/apiCompatChecker');
     await checkApiCompatibility();
   });
 
-  lazyCommand(COMMANDS.DEVICE_MIRROR, async () => {
-    const { openDeviceMirror } = await import('./device/mirrorPanel');
-    await openDeviceMirror();
+  lazyCommand(COMMANDS.DEVICE_MIRROR, async (commandArg?: unknown) => {
+    const [{ openDeviceMirror }, { extractDeviceIdFromCommandArg }] = await Promise.all([
+      import('./device/mirrorPanel'),
+      import('./device/commandArgs'),
+    ]);
+    await openDeviceMirror(extractDeviceIdFromCommandArg(commandArg));
   });
 
-  lazyCommand(COMMANDS.LAUNCH_EMULATOR, async () => {
-    const { launchEmulator } = await import('./device/emulatorManager');
-    await launchEmulator();
+  lazyCommand(COMMANDS.LAUNCH_EMULATOR, async (commandArg?: unknown) => {
+    const [{ launchEmulator }, { extractEmulatorNameFromCommandArg }] = await Promise.all([
+      import('./device/emulatorManager'),
+      import('./device/commandArgs'),
+    ]);
+    await launchEmulator(extractEmulatorNameFromCommandArg(commandArg));
   });
 
   lazyCommand(COMMANDS.STOP_EMULATOR, async () => {
@@ -395,19 +468,8 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
     await checkEnvironment();
   });
 
-  lazyCommand(COMMANDS.TAKE_SCREENSHOT, async () => {
-    const { captureScreenshot } = await import('./debug/uiInspector');
-    const base64 = await captureScreenshot();
-    if (base64) {
-      const fs = await import('fs/promises');
-      const path = await import('path');
-      const folder = getPreferredWorkspaceFolder()?.uri.fsPath ?? '/tmp';
-      const file = path.join(folder, `screenshot_${Date.now()}.png`);
-      await fs.writeFile(file, Buffer.from(base64, 'base64'));
-      await vscode.commands.executeCommand('vscode.open', vscode.Uri.file(file));
-      vscode.window.showInformationMessage(`Screenshot saved: ${file}`);
-    } else {
-      vscode.window.showWarningMessage('Failed to capture screenshot. Is a device connected?');
-    }
+  lazyCommand(COMMANDS.TAKE_SCREENSHOT, async (commandArg?: unknown) => {
+    const { takeDeviceScreenshot } = await import('./device/screenshot');
+    await takeDeviceScreenshot(commandArg);
   });
 }

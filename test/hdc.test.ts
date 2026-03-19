@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildHdcTargetArgs, buildHdcTerminalCommand, parseHdcTargets, rawTerminalArg } from '../src/utils/hdc';
+import {
+  buildHdcTargetArgs,
+  buildHdcTerminalCommand,
+  coerceHdcCommandError,
+  describeHdcCommandError,
+  parseHdcTargets,
+  rawTerminalArg,
+} from '../src/utils/hdc';
 
 describe('hdc utils', () => {
   it('should parse device targets and ignore empty markers', () => {
@@ -32,5 +39,27 @@ describe('hdc utils', () => {
     )).toBe(
       '& \'C:\\Harmony\\hdc.exe\' \'-t\' \'emulator\' \'install\' $hap.FullName',
     );
+  });
+
+  it('should classify HDC server connection failures', () => {
+    const error = coerceHdcCommandError(
+      { message: 'Command failed', stderr: 'Connect server failed\n' },
+      '/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc',
+      ['list', 'targets'],
+    );
+
+    expect(error.kind).toBe('connect-failed');
+    expect(describeHdcCommandError(error)).toContain('could not connect to the HDC server');
+  });
+
+  it('should classify missing HDC binaries', () => {
+    const error = coerceHdcCommandError(
+      { code: 'ENOENT', message: 'spawn hdc ENOENT' },
+      'hdc',
+      ['list', 'targets'],
+    );
+
+    expect(error.kind).toBe('not-found');
+    expect(describeHdcCommandError(error)).toContain('Configure `harmony.hdcPath`');
   });
 });

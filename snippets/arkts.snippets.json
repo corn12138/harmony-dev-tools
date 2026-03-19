@@ -810,5 +810,63 @@
       "  .key((item: ${1:string}) => JSON.stringify(item))"
     ],
     "description": "[API 12+] Repeat — type-safe replacement for ForEach"
+  },
+  "Repeat + @ComponentV2 item (API 12+)": {
+    "prefix": "repeatv2",
+    "body": [
+      "@ComponentV2",
+      "struct ${1:ItemView} {",
+      "  @Param @Require item: ${2:string};",
+      "",
+      "  build() {",
+      "    Text(String(this.item))",
+      "  }",
+      "}",
+      "",
+      "Repeat<${2:string}>(this.${3:items})",
+      "  .each((rep: RepeatItem<${2:string}>) => {",
+      "    ${1:ItemView}({ item: rep.item })",
+      "  })",
+      "  .key((item: ${2:string}) => item)$0"
+    ],
+    "description": "[API 12+] Repeat + @ComponentV2 child — follows the official V2 list pattern"
+  },
+  "WithTheme (API 12+, V2 support API 16+)": {
+    "prefix": "withtheme",
+    "body": [
+      "WithTheme({",
+      "  colorMode: ThemeColorMode.${1:SYSTEM},",
+      "  theme: ${2:CustomThemeImpl}",
+      "}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "[API 12+] WithTheme — scoped theme skinning container (V2 components supported from API 16)"
+  },
+  "ThemeControl.setDefaultTheme (API 12+)": {
+    "prefix": "themecontrol",
+    "body": [
+      "ThemeControl.setDefaultTheme(${1:AppTheme})$0"
+    ],
+    "description": "[API 12+] ThemeControl.setDefaultTheme — app-level theme entry"
+  },
+  "@ReusableV2 (API 18+)": {
+    "prefix": "reusablev2",
+    "body": [
+      "@ReusableV2",
+      "@ComponentV2",
+      "struct ${1:ReusableItem} {",
+      "  @Param ${2:item}: ${3:string};",
+      "",
+      "  aboutToReuse(params: Record<string, Object>): void {",
+      "    $0",
+      "  }",
+      "",
+      "  build() {",
+      "    Text(String(this.${2:item}))",
+      "  }",
+      "}"
+    ],
+    "description": "[API 18+] @ReusableV2 — reusable @ComponentV2 item with reuse lifecycle"
   }
 }

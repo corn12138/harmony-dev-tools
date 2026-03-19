@@ -56,6 +56,14 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
         return this.fixStateShallow(document, diag);
       case DIAG_CODES.LINK_IN_V2:
         return this.fixLinkInV2(document, diag);
+      case DIAG_CODES.REUSABLE_V2_REPEAT_TEMPLATE:
+        return this.fixReusableV2RepeatTemplate(diag);
+      case DIAG_CODES.THEMECONTROL_IN_BUILD:
+        return this.fixThemeControlInBuild(diag);
+      case DIAG_CODES.CUSTOM_THEME_NO_COLORS:
+        return this.fixCustomThemeNoColors(diag);
+      case DIAG_CODES.WITH_THEME_DARK_RESOURCE:
+        return this.fixWithThemeDarkResource(diag);
       case DIAG_CODES.FOREACH_PERF:
         return this.fixForEach(document, diag);
       case DIAG_CODES.V1_V2_MIX:
@@ -156,6 +164,77 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
     return [toParam];
   }
 
+  private fixReusableV2RepeatTemplate(diag: vscode.Diagnostic): vscode.CodeAction[] {
+    const reusableDocs = new vscode.CodeAction(
+      '查看 @ReusableV2 官方指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    reusableDocs.command = {
+      title: 'Open @ReusableV2 Docs',
+      command: 'harmony.openDocs',
+      arguments: ['@ReusableV2'],
+    };
+    reusableDocs.diagnostics = [diag];
+
+    const repeatDocs = new vscode.CodeAction(
+      '查看 Repeat 官方指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    repeatDocs.command = {
+      title: 'Open Repeat Docs',
+      command: 'harmony.openDocs',
+      arguments: ['Repeat'],
+    };
+    repeatDocs.diagnostics = [diag];
+
+    return [reusableDocs, repeatDocs];
+  }
+
+  private fixThemeControlInBuild(diag: vscode.Diagnostic): vscode.CodeAction[] {
+    const themeControlDocs = new vscode.CodeAction(
+      '查看 ThemeControl 官方指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    themeControlDocs.command = {
+      title: 'Open ThemeControl Docs',
+      command: 'harmony.openDocs',
+      arguments: ['ThemeControl'],
+    };
+    themeControlDocs.diagnostics = [diag];
+
+    return [themeControlDocs];
+  }
+
+  private fixCustomThemeNoColors(diag: vscode.Diagnostic): vscode.CodeAction[] {
+    const themeSkinningDocs = new vscode.CodeAction(
+      '查看 Theme Skinning 官方指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    themeSkinningDocs.command = {
+      title: 'Open Theme Skinning Docs',
+      command: 'harmony.openDocs',
+      arguments: ['WithTheme'],
+    };
+    themeSkinningDocs.diagnostics = [diag];
+
+    return [themeSkinningDocs];
+  }
+
+  private fixWithThemeDarkResource(diag: vscode.Diagnostic): vscode.CodeAction[] {
+    const withThemeDocs = new vscode.CodeAction(
+      '查看 WithTheme / dark.json 官方指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    withThemeDocs.command = {
+      title: 'Open WithTheme Docs',
+      command: 'harmony.openDocs',
+      arguments: ['WithTheme'],
+    };
+    withThemeDocs.diagnostics = [diag];
+
+    return [withThemeDocs];
+  }
+
   // Replace ForEach with LazyForEach
   private fixForEach(document: vscode.TextDocument, diag: vscode.Diagnostic): vscode.CodeAction[] {
     const action = new vscode.CodeAction(
@@ -165,7 +244,19 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
     action.edit = new vscode.WorkspaceEdit();
     action.edit.replace(document.uri, diag.range, 'LazyForEach');
     action.diagnostics = [diag];
-    return [action];
+
+    const repeatDocs = new vscode.CodeAction(
+      '查看 Repeat 官方指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    repeatDocs.command = {
+      title: 'Open Repeat Docs',
+      command: 'harmony.openDocs',
+      arguments: ['Repeat'],
+    };
+    repeatDocs.diagnostics = [diag];
+
+    return [action, repeatDocs];
   }
 
   private fixV1V2Mix(document: vscode.TextDocument, diag: vscode.Diagnostic): vscode.CodeAction[] {

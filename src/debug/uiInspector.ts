@@ -46,9 +46,11 @@ export async function captureScreenshot(deviceId?: string, format: 'png' | 'jpeg
   const targetArgs = buildHdcTargetArgs(deviceId);
   const ext = format === 'jpeg' ? 'jpeg' : 'png';
   const tmpDevice = `/data/local/tmp/screenshot.${ext}`;
-  const tmpLocal = `/tmp/harmony_screenshot_${Date.now()}.${ext}`;
 
   try {
+    const os = await import('os');
+    const path = await import('path');
+    const tmpLocal = path.join(os.tmpdir(), `harmony_screenshot_${Date.now()}.${ext}`);
     await execHdc([...targetArgs, 'shell', `snapshot_display -f ${tmpDevice}`], { timeout: 5000 });
     await execHdc([...targetArgs, 'file', 'recv', tmpDevice, tmpLocal], { timeout: 5000 });
     const fs = await import('fs/promises');

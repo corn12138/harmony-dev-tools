@@ -8,6 +8,7 @@ import {
   type DetectedHarmonySdk,
 } from '../utils/harmonySdk';
 import { getDecorators, getComponents, type DecoratorMeta, type ComponentMeta } from '../utils/metadata';
+import { findOnWillApplyThemeUsages, findWithThemeUsages, hasComponentV2Decorator } from '../language/withThemeDiagnostics';
 
 export interface CompatIssue {
   message: string;
@@ -44,6 +45,8 @@ export async function checkApiCompatibility(): Promise<void> {
     if (apiVersion) {
       checkDecoratorsCompat(lines, relativePath, apiVersion, issues);
       checkComponentsCompat(lines, relativePath, apiVersion, issues);
+      checkWithThemeV2Compat(text, relativePath, apiVersion, issues);
+      checkOnWillApplyThemeV2Compat(text, relativePath, apiVersion, issues);
     }
 
     checkV1V2Mixing(text, relativePath, issues);
@@ -98,6 +101,48 @@ function checkComponentsCompat(
         break;
       }
     }
+  }
+}
+
+function checkWithThemeV2Compat(
+  text: string,
+  filePath: string,
+  apiVersion: number,
+  issues: CompatIssue[],
+): void {
+  if (apiVersion >= 16 || !hasComponentV2Decorator(text)) {
+    return;
+  }
+
+  for (const usage of findWithThemeUsages(text)) {
+    issues.push({
+      message: `WithTheme 在 V2 状态管理组件中需要 API 16+，当前项目目标为 API ${apiVersion}。`,
+      severity: 'warning',
+      file: filePath,
+      line: usage.line + 1,
+    });
+    break;
+  }
+}
+
+function checkOnWillApplyThemeV2Compat(
+  text: string,
+  filePath: string,
+  apiVersion: number,
+  issues: CompatIssue[],
+): void {
+  if (apiVersion >= 16 || !hasComponentV2Decorator(text)) {
+    return;
+  }
+
+  for (const usage of findOnWillApplyThemeUsages(text)) {
+    issues.push({
+      message: `onWillApplyTheme 在 V2 状态管理组件中需要 API 16+，当前项目目标为 API ${apiVersion}。`,
+      severity: 'warning',
+      file: filePath,
+      line: usage.line + 1,
+    });
+    break;
   }
 }
 

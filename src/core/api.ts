@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { HarmonyRegistry, Contributor } from './registry';
+import { ExtensionPoints, HarmonyRegistry, Contributor } from './registry';
 import { HarmonyEventBus } from './eventBus';
 import { ProjectInfo, getCurrentProjectInfo, getCurrentProjectFileIndex } from '../project/projectDetector';
 import type { HarmonyProjectFileIndex } from '../project/fileTracker';
@@ -112,7 +112,6 @@ export function createPublicAPI(
   registry: HarmonyRegistry,
   eventBus: HarmonyEventBus
 ): HarmonyDevToolsAPI {
-  const { ExtensionPoints } = require('./registry');
   const deviceChangedEmitter = new vscode.EventEmitter<DeviceChangeEvent>();
 
   eventBus.on('device:connected', (device) => {
