@@ -4,7 +4,7 @@ import { ensureConnectedDevice } from '../device/devices';
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { parseRequestPermissionEntries } from '../project/projectConfigDiagnostics';
-import { listHostIpv4Addresses, parseDeviceIpv4Addresses, pickPreferredDeviceIpv4 } from './network';
+import { formatDebugTarget, listHostNetworkAddresses, parseDeviceNetworkAddresses, pickPreferredDeviceAddress } from './network';
 import { hasWebViewUsage, parseWebDebuggingAccess, type WebDebuggingAccessConfig } from './projectAnalysis';
 
 const WEBVIEW_DEVTOOLS_DOC_URL = 'https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/web/web-debugging-with-devtools.md';
@@ -284,7 +284,7 @@ async function handleWirelessWebViewDebugging(
   moduleJsonUri?: vscode.Uri,
 ): Promise<void> {
   const selectedAddress = await selectWirelessDebugAddress(deviceId);
-  const target = selectedAddress ? `${selectedAddress.address}:${port}` : `<device-ip>:${port}`;
+  const target = selectedAddress ? formatDebugTarget(selectedAddress.address, port) : '<device-ip>:port';
   const actions = [`Copy ${target}`, 'Open Chrome Inspect', 'Open WebView Docs'];
   if (moduleJsonUri) {
     actions.unshift('Open module.json5');
@@ -295,7 +295,7 @@ async function handleWirelessWebViewDebugging(
   const action = await vscode.window.showInformationMessage(
     selectedAddress
       ? `Detected API 20+ wireless WebView debugging on ${target}. Chrome inspect has been opened; if needed, add ${target} under “Discover network targets”.`
-      : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add <device-ip>:${port}.`,
+      : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add ${formatDebugTarget('<device-ip>', port)}.`,
     ...actions,
   );
 
@@ -311,25 +311,25 @@ async function handleWirelessWebViewDebugging(
 }
 
 async function selectWirelessDebugAddress(deviceId: string): Promise<{ address: string } | undefined> {
-  const candidates = await discoverDeviceIpv4Addresses(deviceId);
+  const candidates = await discoverDeviceNetworkAddresses(deviceId);
   if (candidates.length === 0) {
     return undefined;
   }
 
-  return pickPreferredDeviceIpv4(candidates, listHostIpv4Addresses()) ?? candidates[0];
+  return pickPreferredDeviceAddress(candidates, listHostNetworkAddresses()) ?? candidates[0];
 }
 
-async function discoverDeviceIpv4Addresses(deviceId: string) {
+async function discoverDeviceNetworkAddresses(deviceId: string) {
   const targetArgs = buildHdcTargetArgs(deviceId);
   const commands = [
-    'ip -o -4 addr show',
+    'ip -o addr show',
     'ifconfig',
   ];
 
   for (const shellCommand of commands) {
     try {
       const { stdout } = await execHdc([...targetArgs, 'shell', shellCommand], { timeout: 5000 });
-      const addresses = parseDeviceIpv4Addresses(stdout);
+      const addresses = parseDeviceNetworkAddresses(stdout);
       if (addresses.length > 0) {
         return addresses;
       }

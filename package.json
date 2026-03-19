@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Build, run, debug, inspect, and validate HarmonyOS apps directly in VS Code",
-  "version": "0.6.9",
+  "version": "0.6.10",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { listHostIpv4Addresses, parseDeviceIpv4Addresses, pickPreferredDeviceIpv4 } from '../src/webview/network';
+import {
+  formatDebugTarget,
+  listHostIpv4Addresses,
+  listHostNetworkAddresses,
+  parseDeviceIpv4Addresses,
+  parseDeviceNetworkAddresses,
+  pickPreferredDeviceAddress,
+  pickPreferredDeviceIpv4,
+} from '../src/webview/network';
 import { parseWebDebuggingAccess } from '../src/webview/projectAnalysis';
 import {
   parseHdcFportMappings,
@@ -73,6 +81,18 @@ lo        Link encap:Local Loopback
     ]);
   });
 
+  it('should parse device IPv6 addresses and ignore link-local output', () => {
+    const stdout = `
+2: wlan0    inet6 2408:8711:2222:3333::66/64 scope global dynamic
+2: wlan0    inet6 fe80::1234:5678:9abc:def0/64 scope link
+1: lo       inet6 ::1/128 scope host
+`;
+
+    expect(parseDeviceNetworkAddresses(stdout)).toEqual([
+      { interfaceName: 'wlan0', address: '2408:8711:2222:3333::66', family: 'IPv6', prefixLength: 64 },
+    ]);
+  });
+
   it('should prefer a device address that matches the host subnet', () => {
     const deviceAddresses = [
       { interfaceName: 'rmnet0', address: '10.23.4.9', prefixLength: 24 },
@@ -84,6 +104,20 @@ lo        Link encap:Local Loopback
 
     expect(pickPreferredDeviceIpv4(deviceAddresses, hostAddresses)).toEqual(
       { interfaceName: 'wlan0', address: '192.168.8.6', prefixLength: 24 },
+    );
+  });
+
+  it('should prefer an IPv6 device address that matches the host subnet when IPv4 is unavailable', () => {
+    const deviceAddresses = [
+      { interfaceName: 'wlan0', address: '2408:8711:2222:3333::66', family: 'IPv6' as const, prefixLength: 64 },
+      { interfaceName: 'rmnet0', address: 'fd00:1234:5678:9abc::10', family: 'IPv6' as const, prefixLength: 64 },
+    ];
+    const hostAddresses = [
+      { address: '2408:8711:2222:3333::77', family: 'IPv6' as const, prefixLength: 64 },
+    ];
+
+    expect(pickPreferredDeviceAddress(deviceAddresses, hostAddresses)).toEqual(
+      { interfaceName: 'wlan0', address: '2408:8711:2222:3333::66', family: 'IPv6', prefixLength: 64 },
     );
   });
 
@@ -99,5 +133,21 @@ lo        Link encap:Local Loopback
     })).toEqual([
       { address: '192.168.8.20', prefixLength: 24 },
     ]);
+  });
+
+  it('should list non-internal host IPv6 addresses', () => {
+    expect(listHostNetworkAddresses({
+      en0: [
+        { address: '2408:8711:2222:3333::77', netmask: 'ffff', family: 'IPv6', mac: 'aa', internal: false, cidr: '2408:8711:2222:3333::77/64', scopeid: 0 },
+        { address: 'fe80::1', netmask: 'ffff', family: 'IPv6', mac: 'aa', internal: false, cidr: 'fe80::1/64', scopeid: 1 },
+      ],
+    })).toEqual([
+      { address: '2408:8711:2222:3333::77', family: 'IPv6', prefixLength: 64 },
+    ]);
+  });
+
+  it('should format IPv6 debug targets using brackets', () => {
+    expect(formatDebugTarget('2408:8711:2222:3333::66', 8888)).toBe('[2408:8711:2222:3333::66]:8888');
+    expect(formatDebugTarget('192.168.8.6', 8888)).toBe('192.168.8.6:8888');
   });
 });

@@ -6,24 +6,24 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
 > Core goal / 核心目标：hide HDC, hvigor, config migration, and device-targeting complexity behind a simpler VS Code workflow.
 > 把 HDC、hvigor、配置迁移、多设备选择这些复杂度收进插件里，让用户尽量只关心“选设备、点运行、看结果”。
 
-## What's New in v0.6.9 / v0.6.9 新变化
+## What's New in v0.6.10 / v0.6.10 新变化
 
-`v0.6.9` continues to reduce WebView debugging setup work, especially for API 20+ wireless ArkWeb debugging.
-`v0.6.9` 继续把 WebView 调试准备工作收进插件内部，重点补齐了 API 20+ 无线 ArkWeb 调试。
+`v0.6.10` extends wireless ArkWeb DevTools assistance from IPv4-only detection to dual-stack detection.
+`v0.6.10` 把无线 ArkWeb DevTools 从仅 IPv4 探测，扩展到了双栈地址探测。
 
-- **Smarter wireless ArkWeb DevTools / 更聪明的无线 ArkWeb DevTools**
-  - when the project uses `setWebDebuggingAccess(true, port)`, the extension now probes device IPv4 addresses over HDC
-  - 如果工程用了 `setWebDebuggingAccess(true, port)`，插件现在会通过 HDC 探测设备 IPv4 地址
-  - it prefers the address that matches the developer machine subnet and tells the user the exact `device-ip:port` target
-  - 会优先选和开发机同网段的地址，并直接告诉用户精确的 `device-ip:port`
-- **Fewer manual steps / 更少手工步骤**
-  - wireless WebView DevTools now opens `chrome://inspect/#devices` immediately, matching the USB flow more closely
-  - 无线 WebView DevTools 现在也会直接打开 `chrome://inspect/#devices`，和 USB 一键流更一致
-- **Stronger boundary coverage / 更强的边界覆盖**
-  - added parser coverage for device IPv4 discovery from `ip addr` / `ifconfig` outputs and subnet-based target selection
-  - 新增了 `ip addr` / `ifconfig` 输出解析，以及按子网选择调试目标的测试覆盖
+- **Dual-stack wireless detection / 双栈无线探测**
+  - the extension now probes both IPv4 and IPv6 addresses from the target device over HDC
+  - 插件现在会通过 HDC 同时探测目标设备的 IPv4 和 IPv6 地址
+  - it still prefers IPv4 when available, but can fall back to usable IPv6 targets when IPv4 is unavailable
+  - 仍然优先使用 IPv4，但在没有合适 IPv4 时，可以回退到可用的 IPv6 目标
+- **IPv6-aware debug target guidance / IPv6 感知的调试目标提示**
+  - copied wireless debug targets now use correct bracketed syntax such as `[ipv6]:port`
+  - 无线调试复制出来的目标现在会用正确的括号格式，例如 `[ipv6]:port`
+- **Compatibility preserved / 保持兼容**
+  - existing IPv4 behavior and selection priority remain intact, with extra coverage added for IPv6 parsing and subnet matching
+  - 现有 IPv4 行为和优先级保持不变，同时新增了 IPv6 解析和子网匹配覆盖
 
-## How to Use v0.6.9 / v0.6.9 怎么用
+## How to Use v0.6.10 / v0.6.10 怎么用
 
 ### Fastest workflow / 最快上手方式
 
@@ -35,8 +35,8 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
    再点状态栏里的 `HarmonyOS` 按钮，或者点当前设备按钮来选目标设备。
 4. If your page contains `Web(...)`, click `Open WebView DevTools` from `Quick Actions` or the device tree.
    如果页面里用了 `Web(...)`，直接在 `Quick Actions` 或设备树里点 `Open WebView DevTools`。
-5. For API 20+ wireless debugging, the extension will try to detect the device IP automatically and open `chrome://inspect/#devices` for you.
-   对 API 20+ 无线调试，插件会尽量自动探测设备 IP，并直接帮你打开 `chrome://inspect/#devices`。
+5. For API 20+ wireless debugging, the extension will try to detect the device IP automatically, preferring IPv4 but falling back to IPv6 when needed, and open `chrome://inspect/#devices` for you.
+   对 API 20+ 无线调试，插件会尽量自动探测设备 IP，优先用 IPv4，必要时回退到 IPv6，并直接帮你打开 `chrome://inspect/#devices`。
 6. If you are building a themed page, type `withtheme` or `themecontrol`, or search `WithTheme` / `ThemeControl` in docs/completion.
    如果你要做主题换肤页面，直接输入 `withtheme` 或 `themecontrol`，或者在补全/文档搜索里找 `WithTheme` / `ThemeControl`。
 7. If you switch local color mode, make sure the project has either `dark.json` or `resources/dark/...` resources.

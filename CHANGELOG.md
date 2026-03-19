@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.6.10] - 2026-03-19
+- Extended API 20+ wireless ArkWeb DevTools assistance from IPv4-only probing to dual-stack probing, so the extension can now discover and prefer usable device IPv6 addresses when IPv4 is unavailable.
+- Added IPv6-aware target formatting for Chrome inspect guidance, using bracketed host syntax for copied debug targets like `[ipv6]:port`.
+- Expanded wireless-debug parser coverage with IPv6 address discovery, IPv6 host/device subnet matching, and address-family preference tests while keeping existing IPv4 behavior intact.
+
 ## [0.6.9] - 2026-03-19
 - Improved API 20+ wireless ArkWeb DevTools guidance by probing device IPv4 addresses over HDC, preferring the address that matches the developer machine subnet, and surfacing the exact `device-ip:port` target to add in Chrome inspect.
 - Wireless WebView DevTools now opens `chrome://inspect/#devices` immediately, so the user flow matches the USB one-click workflow more closely.
