@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { extractDeviceIdFromCommandArg } from '../device/commandArgs';
 import { ensureConnectedDevice } from '../device/devices';
@@ -5,7 +6,7 @@ import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { parseRequestPermissionEntries } from '../project/projectConfigDiagnostics';
 import { formatDebugTarget, listHostNetworkAddresses, parseDeviceNetworkAddresses, pickPreferredDeviceAddress } from './network';
-import { hasWebViewUsage, parseWebDebuggingAccess, type WebDebuggingAccessConfig } from './projectAnalysis';
+import { extractWebViewUrlHints, hasWebViewUsage, parseWebDebuggingAccess, type WebDebuggingAccessConfig } from './projectAnalysis';
 import { buildDevToolsFrontendUrl, extractInspectablePageTargets, fetchDevToolsTargets, pickSuggestedInspectableTarget, type DevToolsTarget } from './targets';
 
 const WEBVIEW_DEVTOOLS_DOC_URL = 'https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/web/web-debugging-with-devtools.md';
@@ -22,6 +23,7 @@ interface WebViewDebugProjectState {
   hasInternetPermission: boolean;
   moduleJsonUri?: vscode.Uri;
   debugAccess?: WebDebuggingAccessConfig;
+  preferredUrls: string[];
 }
 
 export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
@@ -38,7 +40,12 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
   }
 
   if (projectState?.debugAccess?.port) {
-    await handleWirelessWebViewDebugging(device.id, projectState.debugAccess.port, projectState.moduleJsonUri);
+    await handleWirelessWebViewDebugging(
+      device.id,
+      projectState.debugAccess.port,
+      projectState.moduleJsonUri,
+      projectState.preferredUrls,
+    );
     return;
   }
 
@@ -73,17 +80,20 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
       progress.report({ message: 'Opening Chrome inspect...' });
       await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
 
-      const actions = buildWebViewActions(projectState?.moduleJsonUri, projectState?.hasInternetPermission, targets);
-      if (projectState?.moduleJsonUri && !projectState.hasInternetPermission) {
-        // handled by buildWebViewActions
-      }
+      const actions = buildWebViewActions(
+        projectState?.moduleJsonUri,
+        projectState?.hasInternetPermission,
+        targets,
+        undefined,
+        projectState?.preferredUrls ?? [],
+      );
 
       const action = await vscode.window.showInformationMessage(
-        buildWebViewReadyMessage(`localhost:${port}`, targets),
+        buildWebViewReadyMessage(`localhost:${port}`, targets, false, projectState?.preferredUrls ?? []),
         ...actions,
       );
 
-      await handleWebViewAction(action, endpoint, targets, projectState?.moduleJsonUri);
+      await handleWebViewAction(action, endpoint, targets, projectState?.moduleJsonUri, undefined, projectState?.preferredUrls ?? []);
     },
   );
 }
@@ -141,6 +151,12 @@ async function inspectWebViewDebugProject(rootUri: vscode.Uri): Promise<WebViewD
 
   let hasWebComponent = false;
   let debugAccess: WebDebuggingAccessConfig | undefined;
+  const preferredUrls: string[] = [];
+  const preferredUrlSet = new Set<string>();
+  const activeDocument = vscode.window.activeTextEditor?.document;
+  const activeUri = activeDocument && isUriInsideRoot(activeDocument.uri, rootUri)
+    ? activeDocument.uri.toString()
+    : undefined;
   for (const uri of etsFiles) {
     const text = await safeReadText(uri);
     if (!text) {
@@ -155,7 +171,28 @@ async function inspectWebViewDebugProject(rootUri: vscode.Uri): Promise<WebViewD
     if (config) {
       debugAccess = config;
       if (config.port) {
-        break;
+        // keep scanning for URL hints
+      }
+    }
+
+    const hints = extractWebViewUrlHints(text);
+    if (hints.length > 0) {
+      if (uri.toString() === activeUri) {
+        for (const hint of [...hints].reverse()) {
+          if (preferredUrlSet.has(hint)) {
+            continue;
+          }
+          preferredUrlSet.add(hint);
+          preferredUrls.unshift(hint);
+        }
+      } else {
+        for (const hint of hints) {
+          if (preferredUrlSet.has(hint)) {
+            continue;
+          }
+          preferredUrlSet.add(hint);
+          preferredUrls.push(hint);
+        }
       }
     }
   }
@@ -165,7 +202,13 @@ async function inspectWebViewDebugProject(rootUri: vscode.Uri): Promise<WebViewD
     hasInternetPermission,
     moduleJsonUri,
     debugAccess,
+    preferredUrls,
   };
+}
+
+function isUriInsideRoot(candidate: vscode.Uri, rootUri: vscode.Uri): boolean {
+  const relative = path.relative(rootUri.fsPath, candidate.fsPath);
+  return relative.length === 0 || (!relative.startsWith('..') && !path.isAbsolute(relative));
 }
 
 async function discoverWebViewDevToolsSockets(deviceId: string): Promise<string[]> {
@@ -279,23 +322,24 @@ async function handleWirelessWebViewDebugging(
   deviceId: string,
   port: number,
   moduleJsonUri?: vscode.Uri,
+  preferredUrls: string[] = [],
 ): Promise<void> {
   const selectedAddress = await selectWirelessDebugAddress(deviceId);
   const target = selectedAddress ? formatDebugTarget(selectedAddress.address, port) : formatDebugTarget('<device-ip>', port);
   const endpoint = selectedAddress ? buildHttpEndpoint(selectedAddress.address, port) : undefined;
   const targets = endpoint ? await fetchDevToolsTargets(endpoint).catch(() => []) : [];
-  const actions = buildWebViewActions(moduleJsonUri, true, targets, target);
+  const actions = buildWebViewActions(moduleJsonUri, true, targets, target, preferredUrls);
 
   await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
 
   const action = await vscode.window.showInformationMessage(
     selectedAddress
-      ? buildWebViewReadyMessage(target, targets, true)
+      ? buildWebViewReadyMessage(target, targets, true, preferredUrls)
       : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add ${target}.`,
     ...actions,
   );
 
-  await handleWebViewAction(action, endpoint, targets, moduleJsonUri, target);
+  await handleWebViewAction(action, endpoint, targets, moduleJsonUri, target, preferredUrls);
 }
 
 async function selectWirelessDebugAddress(deviceId: string): Promise<{ address: string } | undefined> {
@@ -337,9 +381,10 @@ function buildWebViewReadyMessage(
   targetLabel: string,
   targets: DevToolsTarget[],
   isWireless = false,
+  preferredUrls: string[] = [],
 ): string {
   const pages = extractInspectablePageTargets(targets);
-  const suggested = pickSuggestedInspectableTarget(targets);
+  const suggested = pickSuggestedInspectableTarget(targets, preferredUrls);
 
   if (suggested) {
     const pageLabel = suggested.title || suggested.url || 'untitled page';
@@ -367,6 +412,7 @@ function buildWebViewActions(
   hasInternetPermission: boolean | undefined,
   targets: DevToolsTarget[],
   copyTarget?: string,
+  preferredUrls: string[] = [],
 ): string[] {
   const actions = ['Open Chrome Inspect', 'Open WebView Docs'];
   if (copyTarget) {
@@ -374,7 +420,7 @@ function buildWebViewActions(
   }
 
   const pages = extractInspectablePageTargets(targets);
-  if (pickSuggestedInspectableTarget(targets)) {
+  if (pickSuggestedInspectableTarget(targets, preferredUrls)) {
     actions.unshift('Open Detected Page');
   } else if (pages.length > 1) {
     actions.unshift('Choose Detected Page');
@@ -393,6 +439,7 @@ async function handleWebViewAction(
   targets: DevToolsTarget[],
   moduleJsonUri?: vscode.Uri,
   copyTarget?: string,
+  preferredUrls: string[] = [],
 ): Promise<void> {
   if (!action) {
     return;
@@ -423,7 +470,7 @@ async function handleWebViewAction(
   }
 
   if (action === 'Open Detected Page') {
-    const target = pickSuggestedInspectableTarget(targets);
+    const target = pickSuggestedInspectableTarget(targets, preferredUrls);
     await openDevToolsTarget(endpoint, target);
     return;
   }

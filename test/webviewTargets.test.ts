@@ -69,6 +69,28 @@ describe('webview targets', () => {
     );
   });
 
+  it('should prefer the target that matches project URL hints', () => {
+    const targets = [
+      { type: 'page', title: 'Home', url: 'https://example.com/home' },
+      { type: 'page', title: 'Checkout', url: 'https://example.com/checkout' },
+    ];
+
+    expect(pickSuggestedInspectableTarget(targets, ['https://example.com/checkout'])).toEqual(
+      { type: 'page', title: 'Checkout', url: 'https://example.com/checkout' },
+    );
+  });
+
+  it('should prefer a nested route when the hint points at its parent path', () => {
+    const targets = [
+      { type: 'page', title: 'Home', url: 'https://example.com/home' },
+      { type: 'page', title: 'Checkout Review', url: 'https://example.com/checkout/review' },
+    ];
+
+    expect(pickSuggestedInspectableTarget(targets, ['https://example.com/checkout'])).toEqual(
+      { type: 'page', title: 'Checkout Review', url: 'https://example.com/checkout/review' },
+    );
+  });
+
   it('should not auto-pick when multiple meaningful pages exist', () => {
     const targets = [
       { type: 'page', title: 'Home', url: 'https://example.com/home' },
@@ -76,6 +98,24 @@ describe('webview targets', () => {
     ];
 
     expect(pickSuggestedInspectableTarget(targets)).toBeUndefined();
+  });
+
+  it('should not auto-pick when URL hints match multiple targets equally', () => {
+    const targets = [
+      { type: 'page', title: 'One', url: 'https://example.com/user' },
+      { type: 'page', title: 'Two', url: 'https://example.com/user' },
+    ];
+
+    expect(pickSuggestedInspectableTarget(targets, ['https://example.com/user'])).toBeUndefined();
+  });
+
+  it('should not auto-pick on hostname-only matches', () => {
+    const targets = [
+      { type: 'page', title: 'Home', url: 'https://example.com/home' },
+      { type: 'page', title: 'Profile', url: 'https://example.com/profile' },
+    ];
+
+    expect(pickSuggestedInspectableTarget(targets, ['https://example.com/unknown'])).toBeUndefined();
   });
 
   it('should build frontend URLs for IPv4 and IPv6 endpoints', () => {

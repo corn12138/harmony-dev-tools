@@ -8,7 +8,7 @@ import {
   pickPreferredDeviceAddress,
   pickPreferredDeviceIpv4,
 } from '../src/webview/network';
-import { parseWebDebuggingAccess } from '../src/webview/projectAnalysis';
+import { extractWebViewUrlHints, parseWebDebuggingAccess } from '../src/webview/projectAnalysis';
 import {
   parseHdcFportMappings,
   parseWebViewDevToolsSockets,
@@ -27,6 +27,17 @@ describe('webview devtools helpers', () => {
       import { webview } from '@kit.ArkWeb';
       webview.WebviewController.setWebDebuggingAccess(true, 8888);
     `)).toEqual({ enabled: true, port: 8888 });
+  });
+
+  it('should extract WebView URL hints from Web src and loadUrl calls', () => {
+    expect(extractWebViewUrlHints(`
+      Web({ src: 'https://example.com/home' })
+      controller.loadUrl("https://example.com/checkout")
+      webviewController.loadUrl('https://example.com/checkout')
+    `)).toEqual([
+      'https://example.com/home',
+      'https://example.com/checkout',
+    ]);
   });
 
   it('should parse running WebView DevTools sockets from hdc shell output', () => {

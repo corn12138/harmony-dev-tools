@@ -56,10 +56,18 @@ export function extractInspectablePageTargets(targets: DevToolsTarget[]): DevToo
   return targets.filter((target) => target.type === 'page' || target.type === 'webview');
 }
 
-export function pickSuggestedInspectableTarget(targets: DevToolsTarget[]): DevToolsTarget | undefined {
+export function pickSuggestedInspectableTarget(
+  targets: DevToolsTarget[],
+  preferredUrls: string[] = [],
+): DevToolsTarget | undefined {
   const pages = extractInspectablePageTargets(targets);
   if (pages.length === 0) {
     return undefined;
+  }
+
+  const hinted = pickTargetByPreferredUrls(pages, preferredUrls);
+  if (hinted) {
+    return hinted;
   }
 
   const meaningful = pages.filter((target) => target.url.trim().length > 0 && target.url !== 'about:blank');
@@ -98,6 +106,71 @@ function ensureBaseUrl(baseUrl: string): string {
   return baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
 }
 
+function pickTargetByPreferredUrls(
+  targets: DevToolsTarget[],
+  preferredUrls: string[],
+): DevToolsTarget | undefined {
+  if (preferredUrls.length === 0 || targets.length === 0) {
+    return undefined;
+  }
+
+  let bestScore = 0;
+  let bestTarget: DevToolsTarget | undefined;
+  let bestCount = 0;
+
+  for (const target of targets) {
+    const score = scoreTargetAgainstHints(target, preferredUrls);
+    if (score <= 0) {
+      continue;
+    }
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestTarget = target;
+      bestCount = 1;
+      continue;
+    }
+
+    if (score === bestScore) {
+      bestCount++;
+    }
+  }
+
+  return bestScore >= 75 && bestCount === 1 ? bestTarget : undefined;
+}
+
+function scoreTargetAgainstHints(target: DevToolsTarget, preferredUrls: string[]): number {
+  return preferredUrls.reduce((best, hint) => Math.max(best, scoreTargetAgainstHint(target, hint)), 0);
+}
+
+function scoreTargetAgainstHint(target: DevToolsTarget, hint: string): number {
+  const targetUrl = safeParseUrl(target.url);
+  const hintUrl = safeParseUrl(hint);
+
+  if (targetUrl && hintUrl) {
+    if (targetUrl.href === hintUrl.href) {
+      return 100;
+    }
+    if (targetUrl.origin === hintUrl.origin && targetUrl.pathname === hintUrl.pathname) {
+      return 90;
+    }
+    if (targetUrl.origin === hintUrl.origin && pathsLikelyMatch(targetUrl.pathname, hintUrl.pathname)) {
+      return 75;
+    }
+    if (targetUrl.hostname === hintUrl.hostname) {
+      return 50;
+    }
+  }
+
+  const targetLabel = `${target.title} ${target.url}`.toLowerCase();
+  const tail = extractLastPathSegment(hint).toLowerCase();
+  if (tail && targetLabel.includes(tail)) {
+    return 40;
+  }
+
+  return 0;
+}
+
 function extractDebuggerPath(value: string): string {
   if (value.startsWith('ws://') || value.startsWith('wss://')) {
     const wsUrl = new URL(value);
@@ -106,6 +179,35 @@ function extractDebuggerPath(value: string): string {
 
   const slashIndex = value.indexOf('/');
   return slashIndex >= 0 ? value.slice(slashIndex + 1) : value;
+}
+
+function safeParseUrl(value: string): URL | undefined {
+  try {
+    return new URL(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizePath(pathname: string): string {
+  return pathname.replace(/\/+$/, '') || '/';
+}
+
+function pathsLikelyMatch(targetPathname: string, hintPathname: string): boolean {
+  const targetPath = normalizePath(targetPathname);
+  const hintPath = normalizePath(hintPathname);
+  return targetPath.startsWith(`${hintPath}/`);
+}
+
+function extractLastPathSegment(value: string): string {
+  const parsed = safeParseUrl(value);
+  if (parsed) {
+    const normalized = normalizePath(parsed.pathname);
+    const segment = normalized.slice(normalized.lastIndexOf('/') + 1);
+    return segment || parsed.hostname;
+  }
+
+  return value;
 }
 
 function requestText(urlString: string, timeout: number): Promise<string> {

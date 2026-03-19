@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.12] - 2026-03-19
+- Added project-aware ArkWeb DevTools page picking by extracting URL hints from `Web({ src: ... })` and `loadUrl(...)` calls in ArkTS files, so the extension can open the most likely page directly instead of making the user guess.
+- Prioritized URL hints from the currently focused ArkTS file, making one-click WebView inspection more likely to land on the page the developer is actively editing.
+- Tightened automatic page opening so same-host targets no longer auto-open on hostname-only matches; ambiguous cases now fall back to the explicit page picker for safer multi-page behavior.
+- Added regression coverage for URL-hint extraction, nested route matching, and hostname-only non-matches in the WebView target selector.
+
 ## [0.6.11] - 2026-03-19
 - Added DevTools target discovery on top of the existing WebView one-click workflow, so the extension now queries the inspectable page list after USB forwarding or wireless endpoint detection.
 - When only one meaningful ArkWeb page is found, the extension can open that detected page directly; when multiple pages are found, it now offers an explicit page picker instead of forcing the user to guess inside Chrome inspect.

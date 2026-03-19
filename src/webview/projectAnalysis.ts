@@ -4,6 +4,10 @@ export interface WebDebuggingAccessConfig {
 }
 
 const WEB_COMPONENT_PATTERN = /\bWeb\s*\(|WebviewController|@kit\.ArkWeb|@ohos\.web\.webview/;
+const WEB_URL_PATTERNS = [
+  /\bWeb\s*\(\s*\{[\s\S]{0,240}?\bsrc\s*:\s*['"]([^'"]+)['"]/g,
+  /\bloadUrl\s*\(\s*['"]([^'"]+)['"]/g,
+] as const;
 
 export function hasWebViewUsage(text: string): boolean {
   return WEB_COMPONENT_PATTERN.test(text);
@@ -19,4 +23,22 @@ export function parseWebDebuggingAccess(text: string): WebDebuggingAccessConfig 
     enabled: true,
     port: match[1] ? Number.parseInt(match[1], 10) : undefined,
   };
+}
+
+export function extractWebViewUrlHints(text: string): string[] {
+  const hints: string[] = [];
+  const seen = new Set<string>();
+
+  for (const pattern of WEB_URL_PATTERNS) {
+    for (const match of text.matchAll(pattern)) {
+      const candidate = match[1]?.trim();
+      if (!candidate || seen.has(candidate)) {
+        continue;
+      }
+      seen.add(candidate);
+      hints.push(candidate);
+    }
+  }
+
+  return hints;
 }
