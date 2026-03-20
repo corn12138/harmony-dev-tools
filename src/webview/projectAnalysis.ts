@@ -5,7 +5,9 @@ export interface WebDebuggingAccessConfig {
 
 const WEB_COMPONENT_PATTERN = /\bWeb\s*\(|WebviewController|@kit\.ArkWeb|@ohos\.web\.webview/;
 const WEB_URL_PATTERNS = [
-  /\bWeb\s*\(\s*\{[\s\S]{0,240}?\bsrc\s*:\s*['"]([^'"]+)['"]/g,
+  // Keep the scan bounded so it stays cheap on large files, while still tolerating
+  // common multiline Web(...) prop blocks before `src`.
+  /\bWeb\s*\(\s*\{[\s\S]{0,2000}?\bsrc\s*:\s*['"]([^'"]+)['"]/g,
   /\bloadUrl\s*\(\s*['"]([^'"]+)['"]/g,
 ] as const;
 

@@ -83,23 +83,35 @@ export function pickSuggestedInspectableTarget(
 }
 
 export function buildDevToolsFrontendUrl(baseUrl: string, target: DevToolsTarget): string | undefined {
-  const endpoint = new URL(ensureBaseUrl(baseUrl));
-  if (target.devtoolsFrontendUrl) {
-    const frontendUrl = new URL(target.devtoolsFrontendUrl, endpoint);
-    const wsValue = frontendUrl.searchParams.get('ws');
-    if (wsValue) {
-      frontendUrl.searchParams.set('ws', `${endpoint.host}/${extractDebuggerPath(wsValue)}`);
-    }
-    return frontendUrl.toString();
-  }
+  try {
+    const endpoint = new URL(ensureBaseUrl(baseUrl));
+    if (target.devtoolsFrontendUrl) {
+      const frontendUrl = new URL(target.devtoolsFrontendUrl, endpoint);
+      frontendUrl.protocol = endpoint.protocol;
+      frontendUrl.username = '';
+      frontendUrl.password = '';
+      frontendUrl.host = endpoint.host;
 
-  if (!target.webSocketDebuggerUrl) {
+      const wsValue = frontendUrl.searchParams.get('ws');
+      if (wsValue) {
+        frontendUrl.searchParams.set('ws', `${endpoint.host}/${extractDebuggerPath(wsValue)}`);
+      }
+      return frontendUrl.toString();
+    }
+
+    if (!target.webSocketDebuggerUrl) {
+      return undefined;
+    }
+
+    const wsUrl = new URL(target.webSocketDebuggerUrl);
+    const path = wsUrl.pathname.replace(/^\//, '');
+    if (!path) {
+      return undefined;
+    }
+    return new URL(`/devtools/inspector.html?ws=${encodeURIComponent(`${endpoint.host}/${path}`)}`, endpoint).toString();
+  } catch {
     return undefined;
   }
-
-  const wsUrl = new URL(target.webSocketDebuggerUrl);
-  const path = wsUrl.pathname.replace(/^\//, '');
-  return new URL(`/devtools/inspector.html?ws=${encodeURIComponent(`${endpoint.host}/${path}`)}`, endpoint).toString();
 }
 
 function ensureBaseUrl(baseUrl: string): string {

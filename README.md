@@ -6,24 +6,24 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
 > Core goal / 核心目标：hide HDC, hvigor, config migration, and device-targeting complexity behind a simpler VS Code workflow.
 > 把 HDC、hvigor、配置迁移、多设备选择这些复杂度收进插件里，让用户尽量只关心“选设备、点运行、看结果”。
 
-## What's New in v0.6.12 / v0.6.12 新变化
+## What's New in v0.6.13 / v0.6.13 新变化
 
-`v0.6.12` keeps removing guesswork from ArkWeb DevTools by letting the extension infer which page you most likely want to inspect.
-`v0.6.12` 继续把 ArkWeb DevTools 里的“猜页面”成本收进插件内部，这一轮重点是按工程代码自动推断最可能要调试的页面。
+`v0.6.13` is a stabilization release for the ArkWeb DevTools workflow after the new project-aware target picking landed.
+`v0.6.13` 是 ArkWeb DevTools 这条链路的一次稳定性版本，重点是把新的一键猜页面能力压到更稳。
 
-- **Project-aware target picking / 工程感知的目标页判断**
-  - the extension now extracts URL hints from `Web({ src: ... })` and `loadUrl(...)` calls in ArkTS files
-  - 插件现在会从 ArkTS 里的 `Web({ src: ... })` 和 `loadUrl(...)` 调用中提取页面 URL 线索
-  - when those hints match a single inspectable page, `Open Detected Page` goes straight to that page instead of asking the user to guess
-  - 当这些线索只匹配到一个可调试页面时，`Open Detected Page` 会直接打开它，不再让用户自己猜
-- **Safer multi-page behavior / 更保守的多页面行为**
-  - same-host pages are no longer auto-opened just because they share a hostname; if the hint is not specific enough, the extension falls back to an explicit picker
-  - 即便多个页面同域名，插件也不会只因主机名相同就自动打开；如果线索不够具体，会回退到明确的页面选择器
-- **Active-file priority / 当前文件优先**
-  - if the currently focused ArkTS file contains WebView URL hints, those hints are preferred when picking the target page
-  - 如果当前正在编辑的 ArkTS 文件里就有 WebView URL 线索，插件会优先用它来判断目标页
+- **More resilient target opening / 更稳的目标页直达**
+  - malformed `devtoolsFrontendUrl` or `webSocketDebuggerUrl` payloads no longer break the direct-open flow
+  - 即便设备返回了畸形的 `devtoolsFrontendUrl` 或 `webSocketDebuggerUrl`，直达页面链路也不会再被打断
+  - absolute frontend URLs are now rewritten back to the current USB or wireless endpoint host before opening
+  - 绝对地址的 frontend URL 现在会重写回当前 USB / 无线端点 host，再去打开
+- **Stronger device-address parsing / 更稳的设备地址解析**
+  - IPv6 addresses with zone suffixes such as `%wlan0` are now normalized correctly for wireless WebView debugging
+  - 带 `%wlan0` 这类 zone suffix 的 IPv6 地址，现在也能被正确标准化并用于无线 WebView 调试
+- **Harder boundary coverage / 更硬的边界覆盖**
+  - added regression coverage for long multiline `Web({ ... src: ... })` blocks, malformed DevTools payloads, title-only mismatches, and IPv6 zone-suffix parsing
+  - 补了长多行 `Web({ ... src: ... })`、畸形 DevTools 目标、仅标题命中误判、IPv6 zone-suffix 解析等回归用例
 
-## How to Use v0.6.12 / v0.6.12 怎么用
+## How to Use v0.6.13 / v0.6.13 怎么用
 
 ### Fastest workflow / 最快上手方式
 
@@ -39,8 +39,8 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
    对 API 20+ 无线调试，插件会尽量自动探测设备 IP，优先用 IPv4，必要时回退到 IPv6，并直接帮你打开 `chrome://inspect/#devices`。
 6. If the current ArkTS file contains `Web({ src: ... })` or `loadUrl(...)`, keep that file focused before you click `Open WebView DevTools`; the extension will use those URL hints to guess the right page first.
    如果当前 ArkTS 文件里有 `Web({ src: ... })` 或 `loadUrl(...)`，在点击 `Open WebView DevTools` 前保持这个文件处于焦点状态；插件会优先拿这些 URL 线索去猜正确页面。
-7. If a single matching WebView page is detected, you can open it directly; if the hint is ambiguous, the extension will switch back to an explicit page picker.
-   如果只检测到一个匹配的 WebView 页面，你可以直接打开它；如果线索不够明确，插件会回退到明确的页面选择器。
+7. If a single matching WebView page is detected, you can open it directly; if the hint is ambiguous, or the runtime target payload is incomplete, the extension will safely fall back instead of opening the wrong page.
+   如果只检测到一个匹配的 WebView 页面，你可以直接打开它；如果线索不够明确，或者运行时返回的目标信息不完整，插件会安全回退，而不是打开错误页面。
 8. If you are building a themed page, type `withtheme` or `themecontrol`, or search `WithTheme` / `ThemeControl` in docs/completion.
    如果你要做主题换肤页面，直接输入 `withtheme` 或 `themecontrol`，或者在补全/文档搜索里找 `WithTheme` / `ThemeControl`。
 9. If you switch local color mode, make sure the project has either `dark.json` or `resources/dark/...` resources.

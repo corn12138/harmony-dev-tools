@@ -32,7 +32,7 @@ export function parseDeviceNetworkAddresses(stdout: string): DeviceNetworkAddres
   const addresses: DeviceNetworkAddress[] = [];
   const seen = new Set<string>();
 
-  for (const match of stdout.matchAll(/^\d+:\s+([^\s:]+)[^\n]*\b(inet6?)\s+([0-9a-fA-F:.%]+)\/(\d{1,3})\b(?:[^\n]*\bscope\s+([a-zA-Z]+))?/gm)) {
+  for (const match of stdout.matchAll(/^\d+:\s+([^\s:]+)[^\n]*\b(inet6?)\s+([0-9a-zA-Z_.:%-]+)\/(\d{1,3})\b(?:[^\n]*\bscope\s+([a-zA-Z]+))?/gm)) {
     const family = match[2] === 'inet6' ? 'IPv6' : 'IPv4';
     const address = normalizeIpAddress(match[3], family);
     const candidate = {
@@ -54,7 +54,7 @@ export function parseDeviceNetworkAddresses(stdout: string): DeviceNetworkAddres
   let currentInterface: string | undefined;
   for (const rawLine of stdout.split('\n')) {
     const line = rawLine.trimEnd();
-    const interfaceMatch = line.match(/^([A-Za-z0-9_.:-]+)(?:\s|:)/);
+    const interfaceMatch = line.match(/^(?:\d+:\s+)?([A-Za-z0-9_.:-]+)(?:\s|:)/);
     if (interfaceMatch && !line.includes(' inet ')) {
       currentInterface = interfaceMatch[1];
     }
@@ -74,7 +74,7 @@ export function parseDeviceNetworkAddresses(stdout: string): DeviceNetworkAddres
       continue;
     }
 
-    const ipv6Match = line.match(/\binet6\s(?:addr:\s*)?([0-9a-fA-F:%]+)(?:\/(\d{1,3}))?(?:.*\bprefixlen\s+(\d{1,3}))?/);
+    const ipv6Match = line.match(/\binet6\s(?:addr:\s*)?([0-9a-zA-Z_.:%-]+)(?:\/(\d{1,3}))?(?:.*\bprefixlen\s+(\d{1,3}))?/);
     if (!ipv6Match) {
       continue;
     }

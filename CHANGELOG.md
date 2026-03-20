@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.13] - 2026-03-20
+- Hardened direct ArkWeb page opening against malformed `devtoolsFrontendUrl` and `webSocketDebuggerUrl` payloads, so bad DevTools target data no longer breaks the one-click inspect flow.
+- Rewrote absolute DevTools frontend URLs back to the current USB or wireless endpoint host before opening them, preventing direct-open actions from jumping to stale or unreachable hosts.
+- Normalized IPv6 addresses with zone suffixes such as `%wlan0` during wireless device-address discovery, fixing a parsing edge case that could misread the interface and drop the prefix length.
+- Expanded WebView regression coverage with long multiline `Web({ ... src: ... })` blocks, malformed target payloads, title-only false positives, exact-vs-parent route preference, and IPv6 zone-suffix parsing.
+
 ## [0.6.12] - 2026-03-19
 - Added project-aware ArkWeb DevTools page picking by extracting URL hints from `Web({ src: ... })` and `loadUrl(...)` calls in ArkTS files, so the extension can open the most likely page directly instead of making the user guess.
 - Prioritized URL hints from the currently focused ArkTS file, making one-click WebView inspection more likely to land on the page the developer is actively editing.

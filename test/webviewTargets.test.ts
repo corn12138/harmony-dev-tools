@@ -118,6 +118,26 @@ describe('webview targets', () => {
     expect(pickSuggestedInspectableTarget(targets, ['https://example.com/unknown'])).toBeUndefined();
   });
 
+  it('should not auto-pick on title-only hint matches', () => {
+    const targets = [
+      { type: 'page', title: 'Checkout', url: '' },
+      { type: 'page', title: 'Payment', url: '' },
+    ];
+
+    expect(pickSuggestedInspectableTarget(targets, ['https://example.com/checkout'])).toBeUndefined();
+  });
+
+  it('should prefer an exact route over a broader parent-path match', () => {
+    const targets = [
+      { type: 'page', title: 'Checkout', url: 'https://example.com/checkout' },
+      { type: 'page', title: 'Checkout Review', url: 'https://example.com/checkout/review' },
+    ];
+
+    expect(pickSuggestedInspectableTarget(targets, ['https://example.com/checkout'])).toEqual(
+      { type: 'page', title: 'Checkout', url: 'https://example.com/checkout' },
+    );
+  });
+
   it('should build frontend URLs for IPv4 and IPv6 endpoints', () => {
     const target = {
       type: 'page',
@@ -132,5 +152,34 @@ describe('webview targets', () => {
     expect(buildDevToolsFrontendUrl('http://[2408:8711:2222:3333::66]:8888', target)).toBe(
       'http://[2408:8711:2222:3333::66]:8888/devtools/inspector.html?ws=%5B2408%3A8711%3A2222%3A3333%3A%3A66%5D%3A8888%2Fdevtools%2Fpage%2Fpage-1',
     );
+  });
+
+  it('should rewrite absolute frontend hosts back to the current endpoint', () => {
+    const target = {
+      type: 'page',
+      title: 'Home',
+      url: 'https://example.com/home',
+      devtoolsFrontendUrl: 'http://10.0.0.8:9222/devtools/inspector.html?ws=10.0.0.8:9222/devtools/page/page-1',
+    };
+
+    expect(buildDevToolsFrontendUrl('http://127.0.0.1:9333', target)).toBe(
+      'http://127.0.0.1:9333/devtools/inspector.html?ws=127.0.0.1%3A9333%2Fdevtools%2Fpage%2Fpage-1',
+    );
+  });
+
+  it('should return undefined for malformed frontend or websocket URLs', () => {
+    expect(buildDevToolsFrontendUrl('http://127.0.0.1:9222', {
+      type: 'page',
+      title: 'Broken Frontend',
+      url: '',
+      devtoolsFrontendUrl: 'http://[::1',
+    })).toBeUndefined();
+
+    expect(buildDevToolsFrontendUrl('http://127.0.0.1:9222', {
+      type: 'page',
+      title: 'Broken WS',
+      url: '',
+      webSocketDebuggerUrl: 'not-a-valid-url',
+    })).toBeUndefined();
   });
 });

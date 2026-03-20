@@ -29,6 +29,21 @@ describe('webview devtools helpers', () => {
     `)).toEqual({ enabled: true, port: 8888 });
   });
 
+  it('should ignore disabled WebView DevTools and still parse multiline enabled calls', () => {
+    expect(parseWebDebuggingAccess(`
+      import { webview } from '@kit.ArkWeb';
+      webview.WebviewController.setWebDebuggingAccess(false, 8888);
+    `)).toBeUndefined();
+
+    expect(parseWebDebuggingAccess(`
+      import { webview } from '@kit.ArkWeb';
+      webview.WebviewController.setWebDebuggingAccess(
+        true,
+        9333
+      );
+    `)).toEqual({ enabled: true, port: 9333 });
+  });
+
   it('should extract WebView URL hints from Web src and loadUrl calls', () => {
     expect(extractWebViewUrlHints(`
       Web({ src: 'https://example.com/home' })
@@ -37,6 +52,19 @@ describe('webview devtools helpers', () => {
     `)).toEqual([
       'https://example.com/home',
       'https://example.com/checkout',
+    ]);
+  });
+
+  it('should extract WebView src after large multiline prop blocks without duplicating URLs', () => {
+    const filler = Array.from({ length: 80 }, (_, index) => `prop${index}: value${index},`).join('\n');
+    expect(extractWebViewUrlHints(`
+      Web({
+        ${filler}
+        src: "https://example.com/deep/page"
+      })
+      controller.loadUrl('https://example.com/deep/page')
+    `)).toEqual([
+      'https://example.com/deep/page',
     ]);
   });
 
@@ -97,6 +125,16 @@ lo        Link encap:Local Loopback
 2: wlan0    inet6 2408:8711:2222:3333::66/64 scope global dynamic
 2: wlan0    inet6 fe80::1234:5678:9abc:def0/64 scope link
 1: lo       inet6 ::1/128 scope host
+`;
+
+    expect(parseDeviceNetworkAddresses(stdout)).toEqual([
+      { interfaceName: 'wlan0', address: '2408:8711:2222:3333::66', family: 'IPv6', prefixLength: 64 },
+    ]);
+  });
+
+  it('should normalize IPv6 zone suffixes from device output', () => {
+    const stdout = `
+2: wlan0    inet6 2408:8711:2222:3333::66%wlan0/64 scope global dynamic
 `;
 
     expect(parseDeviceNetworkAddresses(stdout)).toEqual([
