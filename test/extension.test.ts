@@ -379,4 +379,38 @@ describe('extension smoke', () => {
 
     expect(detectorDeactivate).toHaveBeenCalledTimes(1);
   });
+
+  it('should survive repeated activate/deactivate cycles without leaking registrations', async () => {
+    const vscode = await import('vscode');
+    const { activate, deactivate } = await import('../src/extension');
+
+    for (let cycle = 0; cycle < 20; cycle += 1) {
+      (vscode as any).__reset();
+      vscode.workspace.workspaceFolders = [
+        {
+          name: 'demo',
+          uri: vscode.Uri.file('/workspace/demo'),
+          index: 0,
+        },
+      ] as any;
+
+      const context = createExtensionContext();
+      context.extensionUri = vscode.Uri.file('/extension');
+      context.globalStorageUri = vscode.Uri.file('/extension/storage');
+      context.logUri = vscode.Uri.file('/extension/log');
+
+      activate(context);
+      await flushImports();
+
+      expect((vscode as any).__getRegisteredCommands().length).toBeGreaterThan(0);
+
+      await deactivate();
+      [...context.subscriptions].reverse().forEach((subscription: any) => subscription?.dispose?.());
+
+      expect((vscode as any).__getRegisteredCommands()).toEqual([]);
+    }
+
+    expect(detectorActivate).toHaveBeenCalledTimes(20);
+    expect(detectorDeactivate).toHaveBeenCalledTimes(20);
+  });
 });

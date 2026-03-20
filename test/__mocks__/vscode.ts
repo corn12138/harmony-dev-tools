@@ -11,7 +11,14 @@ const executedCommands: Array<{ command: string; args: any[] }> = [];
 const createdTreeViews: Array<{ id: string; options: any }> = [];
 const debugSessions: Array<{ folder: any; config: any }> = [];
 const statusBarItems: MockStatusBarItem[] = [];
+const fileSystemWatchers: MockFileSystemWatcher[] = [];
+const diagnosticCollections = new Map<string, MockDiagnosticCollection>();
 let nextQuickPickResult: any = undefined;
+let openTextDocumentEmitter: EventEmitter<any>;
+let saveTextDocumentEmitter: EventEmitter<any>;
+let changeTextDocumentEmitter: EventEmitter<any>;
+let workspaceFoldersEmitter: EventEmitter<any>;
+let configurationEmitter: EventEmitter<any>;
 
 export enum CompletionItemKind {
   Text = 0,
@@ -113,8 +120,22 @@ export class EventEmitter<T> {
   }
 }
 
+function resetWorkspaceEmitters(): void {
+  openTextDocumentEmitter = new EventEmitter<any>();
+  saveTextDocumentEmitter = new EventEmitter<any>();
+  changeTextDocumentEmitter = new EventEmitter<any>();
+  workspaceFoldersEmitter = new EventEmitter<any>();
+  configurationEmitter = new EventEmitter<any>();
+}
+
+resetWorkspaceEmitters();
+
 export class MarkdownString {
   value = '';
+
+  constructor(value = '') {
+    this.value = value;
+  }
 
   appendCodeblock(code: string, lang?: string): void {
     this.value += `\`\`\`${lang ?? ''}\n${code}\n\`\`\`\n`;
@@ -167,6 +188,10 @@ export class Selection extends Range {}
 
 export class Hover {
   constructor(public readonly contents: any, public readonly range?: any) {}
+}
+
+export class Location {
+  constructor(public readonly uri: Uri, public readonly rangeOrPosition: any) {}
 }
 
 export class ThemeIcon {
@@ -275,6 +300,8 @@ export class DebugAdapterInlineImplementation {
 class MockDiagnosticCollection {
   private readonly items = new Map<string, Diagnostic[]>();
 
+  constructor(public readonly name = '') {}
+
   set(uri: Uri, diagnostics: Diagnostic[]): void {
     this.items.set(uri.toString(), diagnostics);
   }
@@ -285,6 +312,10 @@ class MockDiagnosticCollection {
 
   clear(): void {
     this.items.clear();
+  }
+
+  get(uri: Uri): Diagnostic[] | undefined {
+    return this.items.get(uri.toString());
   }
 
   dispose(): void {
@@ -333,6 +364,42 @@ class MockStatusBarItem {
   }
 }
 
+class MockFileSystemWatcher {
+  private readonly createEmitter = new EventEmitter<Uri>();
+  private readonly changeEmitter = new EventEmitter<Uri>();
+  private readonly deleteEmitter = new EventEmitter<Uri>();
+
+  onDidCreate(listener: (uri: Uri) => void): Disposable {
+    return this.createEmitter.event(listener);
+  }
+
+  onDidChange(listener: (uri: Uri) => void): Disposable {
+    return this.changeEmitter.event(listener);
+  }
+
+  onDidDelete(listener: (uri: Uri) => void): Disposable {
+    return this.deleteEmitter.event(listener);
+  }
+
+  fireCreate(uri: Uri): void {
+    this.createEmitter.fire(uri);
+  }
+
+  fireChange(uri: Uri): void {
+    this.changeEmitter.fire(uri);
+  }
+
+  fireDelete(uri: Uri): void {
+    this.deleteEmitter.fire(uri);
+  }
+
+  dispose(): void {
+    this.createEmitter.dispose();
+    this.changeEmitter.dispose();
+    this.deleteEmitter.dispose();
+  }
+}
+
 function noopDisposable(): Disposable {
   return new Disposable();
 }
@@ -343,17 +410,23 @@ function createEventRegistration(): Disposable {
 
 export const workspace = {
   workspaceFolders: [] as any[],
+  textDocuments: [] as any[],
   getConfiguration: (_section?: string) => ({
     get: (_key: string, defaultValue?: any) => defaultValue,
   }),
   findFiles: async () => [],
+  createFileSystemWatcher: (_pattern: any) => {
+    const watcher = new MockFileSystemWatcher();
+    fileSystemWatchers.push(watcher);
+    return watcher;
+  },
   getWorkspaceFolder: (uri: Uri) =>
     workspace.workspaceFolders.find((folder) => uri.fsPath.startsWith(folder.uri.fsPath)),
-  onDidOpenTextDocument: () => createEventRegistration(),
-  onDidSaveTextDocument: () => createEventRegistration(),
-  onDidChangeTextDocument: () => createEventRegistration(),
-  onDidChangeWorkspaceFolders: () => createEventRegistration(),
-  onDidChangeConfiguration: () => createEventRegistration(),
+  onDidOpenTextDocument: (listener: (document: any) => void) => openTextDocumentEmitter.event(listener),
+  onDidSaveTextDocument: (listener: (document: any) => void) => saveTextDocumentEmitter.event(listener),
+  onDidChangeTextDocument: (listener: (event: any) => void) => changeTextDocumentEmitter.event(listener),
+  onDidChangeWorkspaceFolders: (listener: (event: any) => void) => workspaceFoldersEmitter.event(listener),
+  onDidChangeConfiguration: (listener: (event: any) => void) => configurationEmitter.event(listener),
   fs: {
     stat: async (_uri: Uri) => ({ type: FileType.File }),
     readFile: async (_uri: Uri) => Buffer.from(''),
@@ -409,7 +482,11 @@ export const languages = {
   registerColorProvider: () => noopDisposable(),
   registerDefinitionProvider: () => noopDisposable(),
   registerCodeActionsProvider: () => noopDisposable(),
-  createDiagnosticCollection: () => new MockDiagnosticCollection(),
+  createDiagnosticCollection: (name = '') => {
+    const collection = new MockDiagnosticCollection(name);
+    diagnosticCollections.set(name, collection);
+    return collection;
+  },
 };
 
 export const commands = {
@@ -463,6 +540,29 @@ export function __getStatusBarItems(): MockStatusBarItem[] {
   return statusBarItems.slice();
 }
 
+export function __getFileSystemWatchers(): MockFileSystemWatcher[] {
+  return fileSystemWatchers.slice();
+}
+
+export function __getDiagnosticCollection(name: string): MockDiagnosticCollection | undefined {
+  return diagnosticCollections.get(name);
+}
+
+export function __fireDidOpenTextDocument(document: any): void {
+  if (!workspace.textDocuments.includes(document)) {
+    workspace.textDocuments.push(document);
+  }
+  openTextDocumentEmitter.fire(document);
+}
+
+export function __fireDidSaveTextDocument(document: any): void {
+  saveTextDocumentEmitter.fire(document);
+}
+
+export function __fireDidChangeTextDocument(document: any): void {
+  changeTextDocumentEmitter.fire({ document });
+}
+
 export function __setQuickPickResult(value: any): void {
   nextQuickPickResult = value;
 }
@@ -473,7 +573,16 @@ export function __reset(): void {
   createdTreeViews.length = 0;
   debugSessions.length = 0;
   statusBarItems.length = 0;
+  fileSystemWatchers.length = 0;
+  diagnosticCollections.clear();
   nextQuickPickResult = undefined;
   workspace.workspaceFolders = [];
+  workspace.textDocuments = [];
   window.activeTextEditor = undefined;
+  openTextDocumentEmitter.dispose();
+  saveTextDocumentEmitter.dispose();
+  changeTextDocumentEmitter.dispose();
+  workspaceFoldersEmitter.dispose();
+  configurationEmitter.dispose();
+  resetWorkspaceEmitters();
 }

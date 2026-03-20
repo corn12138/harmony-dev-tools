@@ -1,8 +1,23 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { analyzeText, extractBuildBlocks, DIAG_CODES, isDarkThemeResourcePath } from '../src/language/diagnosticProvider';
 
 // We mock vscode.DiagnosticSeverity as plain numbers matching the enum
 // 0=Error, 1=Warning, 2=Information, 3=Hint
+
+function createArkTsDocument(vscode: any, text: string, filePath: string) {
+  return {
+    uri: vscode.Uri.file(filePath),
+    fileName: filePath,
+    languageId: 'arkts',
+    getText: () => text,
+  };
+}
+
+async function flushAsyncWork(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
 
 describe('diagnosticProvider — analyzeText', () => {
   // -------------------------------------------------------------------
@@ -481,6 +496,113 @@ describe('api-level compatibility diagnostics', () => {
     ].join('\n');
     const diags = analyzeText(code, undefined, { hasDarkThemeResource: false });
     expect(diags.filter((d) => d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE)).toHaveLength(0);
+  });
+
+  it('should not warn about dark.json for light-only colorMode overrides', () => {
+    const code = [
+      '@Entry',
+      '@Component',
+      'struct ThemedPage {',
+      '  build() {',
+      '    WithTheme({ colorMode: ThemeColorMode.LIGHT }) {',
+      '      Text("hello")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+    const diags = analyzeText(code, undefined, { hasDarkThemeResource: false });
+    expect(diags.filter((d) => d.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE)).toHaveLength(0);
+  });
+});
+
+describe('diagnosticProvider dark resource refresh', () => {
+  beforeEach(async () => {
+    vi.resetModules();
+    const vscode = await import('vscode');
+    (vscode as any).__reset();
+    vscode.workspace.workspaceFolders = [
+      {
+        name: 'demo',
+        uri: vscode.Uri.file('/workspace/demo'),
+        index: 0,
+      },
+    ] as any;
+  });
+
+  it('recomputes all tracked ArkTS diagnostics when dark resources change', async () => {
+    const vscode = await import('vscode');
+    let hasDarkResources = false;
+    const docA = createArkTsDocument(
+      vscode,
+      [
+        '@Entry',
+        '@Component',
+        'struct PageA {',
+        '  build() {',
+        '    WithTheme({ colorMode: ThemeColorMode.DARK }) {',
+        '      Text("A")',
+        '    }',
+        '  }',
+        '}',
+      ].join('\n'),
+      '/workspace/demo/entry/src/main/ets/pages/PageA.ets',
+    );
+    const docB = createArkTsDocument(
+      vscode,
+      [
+        '@Entry',
+        '@Component',
+        'struct PageB {',
+        '  build() {',
+        '    WithTheme({ colorMode: ThemeColorMode.SYSTEM }) {',
+        '      Text("B")',
+        '    }',
+        '  }',
+        '}',
+      ].join('\n'),
+      '/workspace/demo/entry/src/main/ets/pages/PageB.ets',
+    );
+
+    vscode.workspace.textDocuments = [docA, docB];
+    vscode.window.activeTextEditor = { document: docA };
+    vscode.workspace.findFiles = vi.fn(async (pattern: any) => {
+      const value = typeof pattern === 'string' ? pattern : pattern.pattern;
+      if (value === '**/resources/**/dark.json') {
+        return hasDarkResources
+          ? [vscode.Uri.file('/workspace/demo/entry/src/main/resources/base/profile/dark.json')]
+          : [];
+      }
+
+      if (value === '**/resources/**/dark/**') {
+        return hasDarkResources
+          ? [vscode.Uri.file('/workspace/demo/entry/src/main/resources/dark/element/color.json')]
+          : [];
+      }
+
+      return [];
+    }) as any;
+
+    const { createDiagnosticProvider } = await import('../src/language/diagnosticProvider');
+    const provider = createDiagnosticProvider({ subscriptions: [] } as any);
+
+    await flushAsyncWork();
+    (vscode as any).__fireDidSaveTextDocument(docB);
+    await flushAsyncWork();
+
+    const collection = (vscode as any).__getDiagnosticCollection('arkts-lint');
+    expect(collection.get(docA.uri).some((diag: any) => diag.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE)).toBe(true);
+    expect(collection.get(docB.uri).some((diag: any) => diag.code === DIAG_CODES.WITH_THEME_DARK_RESOURCE)).toBe(true);
+
+    hasDarkResources = true;
+    for (const watcher of (vscode as any).__getFileSystemWatchers()) {
+      watcher.fireCreate(vscode.Uri.file('/workspace/demo/entry/src/main/resources/dark/element/color.json'));
+    }
+    await flushAsyncWork();
+
+    expect(collection.get(docA.uri) ?? []).toHaveLength(0);
+    expect(collection.get(docB.uri) ?? []).toHaveLength(0);
+
+    provider.dispose();
   });
 });
 

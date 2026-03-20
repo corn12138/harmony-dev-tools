@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.6.14] - 2026-03-20
+- Removed the static `setWebDebuggingAccess(true)` hard gate from the WebView DevTools command, so valid running targets can still be discovered through runtime ArkWeb sockets even when code scanning misses the enablement call.
+- Narrowed `WithTheme({ colorMode: ... })` dark-resource diagnostics to skip light-only overrides, eliminating a false warning for valid `ThemeColorMode.LIGHT` usage.
+- Recomputed tracked ArkTS dark-theme diagnostics after `dark.json` or `resources/dark/...` changes, so stale Problems entries now clear across all affected files instead of only the active editor.
+- Added regression coverage for the runtime WebView DevTools fallback path, light-only `WithTheme` color modes, and workspace-wide dark-resource diagnostic refresh.
+
 ## [0.6.13] - 2026-03-20
 - Hardened direct ArkWeb page opening against malformed `devtoolsFrontendUrl` and `webSocketDebuggerUrl` payloads, so bad DevTools target data no longer breaks the one-click inspect flow.
 - Rewrote absolute DevTools frontend URLs back to the current USB or wireless endpoint host before opening them, preventing direct-open actions from jumping to stale or unreachable hosts.

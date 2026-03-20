@@ -80,6 +80,7 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
 
   let cachedApiLevel: number | undefined;
   const darkThemeResourceCache = new Map<string, boolean>();
+  const trackedArkTsUris = new Map<string, vscode.Uri>();
   const runVersions = new Map<string, number>();
   const darkThemeWatchers: vscode.FileSystemWatcher[] = [];
 
@@ -123,25 +124,59 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
     return result;
   };
 
-  const runDiag = async (doc: vscode.TextDocument) => {
-    if (doc.languageId !== 'arkts' && !doc.fileName.endsWith('.ets')) return;
-
-    const text = doc.getText();
-    const uriKey = doc.uri.toString();
+  const runDiagForText = async (uri: vscode.Uri, text: string) => {
+    const uriKey = uri.toString();
+    trackedArkTsUris.set(uriKey, uri);
     const version = (runVersions.get(uriKey) ?? 0) + 1;
     runVersions.set(uriKey, version);
 
     const analyzeContext: AnalyzeContext = {};
     if (findWithThemeColorModeUsages(text).length > 0) {
-      analyzeContext.hasDarkThemeResource = await hasDarkThemeResource(getPreferredWorkspaceFolder(doc.uri));
+      analyzeContext.hasDarkThemeResource = await hasDarkThemeResource(getPreferredWorkspaceFolder(uri));
     }
 
     if (runVersions.get(uriKey) !== version) {
       return;
     }
 
-    const diagnostics = analyzeDocument(doc, cachedApiLevel, analyzeContext);
-    collection.set(doc.uri, diagnostics);
+    const diagnostics = analyzeDocumentText(text, cachedApiLevel, analyzeContext);
+    collection.set(uri, diagnostics);
+  };
+
+  const runDiag = async (doc: vscode.TextDocument) => {
+    if (doc.languageId !== 'arkts' && !doc.fileName.endsWith('.ets')) return;
+
+    await runDiagForText(doc.uri, doc.getText());
+  };
+
+  const runDiagForUri = async (uri: vscode.Uri) => {
+    if (!uri.fsPath.endsWith('.ets')) {
+      return;
+    }
+
+    try {
+      const raw = await vscode.workspace.fs.readFile(uri);
+      await runDiagForText(uri, Buffer.from(raw).toString('utf8'));
+    } catch {
+      trackedArkTsUris.delete(uri.toString());
+      runVersions.delete(uri.toString());
+      collection.delete(uri);
+    }
+  };
+
+  const refreshTrackedDiagnostics = async () => {
+    const openArkTsDocuments = new Map<string, vscode.TextDocument>();
+    for (const document of vscode.workspace.textDocuments) {
+      if (document.languageId === 'arkts' || document.fileName.endsWith('.ets')) {
+        openArkTsDocuments.set(document.uri.toString(), document);
+        trackedArkTsUris.set(document.uri.toString(), document.uri);
+      }
+    }
+
+    await Promise.all(Array.from(trackedArkTsUris.entries()).map(([uriKey, uri]) => {
+      const openDocument = openArkTsDocuments.get(uriKey);
+      return openDocument ? runDiag(openDocument) : runDiagForUri(uri);
+    }));
   };
 
   const onOpen = vscode.workspace.onDidOpenTextDocument(runDiag);
@@ -156,9 +191,7 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
 
   const invalidateDarkThemeCache = () => {
     darkThemeResourceCache.clear();
-    if (vscode.window.activeTextEditor) {
-      void runDiag(vscode.window.activeTextEditor.document);
-    }
+    void refreshTrackedDiagnostics();
   };
   for (const pattern of ['**/resources/**/dark.json', '**/resources/**/dark/**']) {
     const watcher = vscode.workspace.createFileSystemWatcher(pattern);
@@ -208,8 +241,8 @@ export function analyzeText(text: string, projectApiLevel?: number, context: Ana
   return diags;
 }
 
-function analyzeDocument(doc: vscode.TextDocument, projectApiLevel?: number, context: AnalyzeContext = {}): vscode.Diagnostic[] {
-  const raw = analyzeText(doc.getText(), projectApiLevel, context);
+function analyzeDocumentText(text: string, projectApiLevel?: number, context: AnalyzeContext = {}): vscode.Diagnostic[] {
+  const raw = analyzeText(text, projectApiLevel, context);
   return raw.map((r) => {
     const range = new vscode.Range(r.line, r.colStart, r.line, r.colEnd);
     const d = new vscode.Diagnostic(range, r.message, r.severity);
@@ -217,6 +250,10 @@ function analyzeDocument(doc: vscode.TextDocument, projectApiLevel?: number, con
     d.source = SOURCE;
     return d;
   });
+}
+
+function analyzeDocument(doc: vscode.TextDocument, projectApiLevel?: number, context: AnalyzeContext = {}): vscode.Diagnostic[] {
+  return analyzeDocumentText(doc.getText(), projectApiLevel, context);
 }
 
 // ---------------------------------------------------------------------------

@@ -20,6 +20,7 @@ export class ResourceIndexer implements vscode.Disposable {
   private _onDidUpdate = new vscode.EventEmitter<void>();
   private initialized = false;
   private initializing?: Promise<void>;
+  private rebuildVersion = 0;
   readonly onDidUpdate = this._onDidUpdate.event;
 
   constructor() {
@@ -38,11 +39,17 @@ export class ResourceIndexer implements vscode.Disposable {
   }
 
   async rebuild(): Promise<void> {
+    const rebuildVersion = ++this.rebuildVersion;
     this.initializing = undefined;
-    this.resources.clear();
+    const nextResources = new Map<string, ResourceEntry>();
     const folders = vscode.workspace.workspaceFolders;
     if (!folders) {
+      if (!this.isLatestRebuild(rebuildVersion)) {
+        return;
+      }
+      this.resources = nextResources;
       this.initialized = true;
+      this._onDidUpdate.fire();
       return;
     }
 
@@ -52,8 +59,14 @@ export class ResourceIndexer implements vscode.Disposable {
         new vscode.RelativePattern(folder, '**/resources/base/element/*.json'),
         '**/node_modules/**'
       );
+      if (!this.isLatestRebuild(rebuildVersion)) {
+        return;
+      }
       for (const uri of elementFiles) {
-        await this.indexElementFile(uri);
+        await this.indexElementFile(uri, nextResources);
+        if (!this.isLatestRebuild(rebuildVersion)) {
+          return;
+        }
       }
 
       // Scan media directory
@@ -61,10 +74,13 @@ export class ResourceIndexer implements vscode.Disposable {
         new vscode.RelativePattern(folder, '**/resources/base/media/*'),
         '**/node_modules/**'
       );
+      if (!this.isLatestRebuild(rebuildVersion)) {
+        return;
+      }
       for (const uri of mediaFiles) {
         const name = path.basename(uri.fsPath, path.extname(uri.fsPath));
         const key = `app.media.${name}`;
-        this.resources.set(key, { key, type: 'media', name, fileUri: uri });
+        nextResources.set(key, { key, type: 'media', name, fileUri: uri });
       }
 
       // Scan profile directory
@@ -72,13 +88,21 @@ export class ResourceIndexer implements vscode.Disposable {
         new vscode.RelativePattern(folder, '**/resources/base/profile/*.json'),
         '**/node_modules/**'
       );
+      if (!this.isLatestRebuild(rebuildVersion)) {
+        return;
+      }
       for (const uri of profileFiles) {
         const name = path.basename(uri.fsPath, '.json');
         const key = `app.profile.${name}`;
-        this.resources.set(key, { key, type: 'profile', name, fileUri: uri });
+        nextResources.set(key, { key, type: 'profile', name, fileUri: uri });
       }
     }
 
+    if (!this.isLatestRebuild(rebuildVersion)) {
+      return;
+    }
+
+    this.resources = nextResources;
     this.initialized = true;
     this._onDidUpdate.fire();
   }
@@ -89,13 +113,23 @@ export class ResourceIndexer implements vscode.Disposable {
     }
 
     if (!this.initializing) {
-      this.initializing = this.rebuild();
+      const rebuildPromise = this.rebuild();
+      let trackedPromise: Promise<void>;
+      trackedPromise = rebuildPromise.finally(() => {
+        if (this.initializing === trackedPromise) {
+          this.initializing = undefined;
+        }
+      });
+      this.initializing = trackedPromise;
     }
 
     await this.initializing;
   }
 
-  private async indexElementFile(uri: vscode.Uri): Promise<void> {
+  private async indexElementFile(
+    uri: vscode.Uri,
+    target: Map<string, ResourceEntry>,
+  ): Promise<void> {
     try {
       const content = await vscode.workspace.fs.readFile(uri);
       const text = Buffer.from(content).toString('utf8');
@@ -107,7 +141,7 @@ export class ResourceIndexer implements vscode.Disposable {
       const entries: { name: string; value: string }[] = json[type] ?? [];
       for (const entry of entries) {
         const key = `app.${type}.${entry.name}`;
-        this.resources.set(key, {
+        target.set(key, {
           key,
           type,
           name: entry.name,
@@ -118,6 +152,10 @@ export class ResourceIndexer implements vscode.Disposable {
     } catch {
       // Invalid JSON, skip
     }
+  }
+
+  private isLatestRebuild(rebuildVersion: number): boolean {
+    return rebuildVersion === this.rebuildVersion;
   }
 
   getAll(): ResourceEntry[] {

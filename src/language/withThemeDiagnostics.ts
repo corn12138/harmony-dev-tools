@@ -22,7 +22,7 @@ export function findWithThemeUsages(text: string): WithThemeUsage[] {
 
 export function findWithThemeColorModeUsages(text: string): WithThemeUsage[] {
   return extractCallArgumentBlocks(text, /\bWithTheme\s*\(/, 'WithTheme')
-    .filter((block) => /\bcolorMode\s*:/.test(block.args))
+    .filter((block) => hasDarkCapableColorMode(block.args))
     .map((block) => block.usage);
 }
 
@@ -81,6 +81,15 @@ function findNamedUsages(text: string, pattern: RegExp, label: string): WithThem
   }
 
   return usages;
+}
+
+function hasDarkCapableColorMode(args: string): boolean {
+  if (!/\bcolorMode\s*:/.test(args)) {
+    return false;
+  }
+
+  return !/\bcolorMode\s*:\s*(?:ThemeColorMode\.)?LIGHT\b/.test(args)
+    && !/\bcolorMode\s*:\s*['"]light['"]/i.test(args);
 }
 
 function extractCallArgumentBlocks(

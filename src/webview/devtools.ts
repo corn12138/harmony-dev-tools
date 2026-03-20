@@ -49,11 +49,6 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
     return;
   }
 
-  if (projectState && !projectState.debugAccess?.enabled) {
-    await explainMissingWebDebugAccess(projectState);
-    return;
-  }
-
   await vscode.window.withProgress(
     {
       location: vscode.ProgressLocation.Notification,
@@ -266,24 +261,6 @@ async function pickWebViewSocket(sockets: string[]): Promise<string | undefined>
   );
 
   return pick?.socket;
-}
-
-async function explainMissingWebDebugAccess(projectState?: WebViewDebugProjectState): Promise<void> {
-  const actions = ['Open WebView Docs'];
-  if (projectState?.moduleJsonUri && !projectState.hasInternetPermission) {
-    actions.unshift('Open module.json5');
-  }
-
-  const hint = projectState?.hasWebComponent
-    ? 'No setWebDebuggingAccess(true) call was found. Enable Web debugging in app code before opening DevTools.'
-    : 'No Web component usage was detected in the current workspace, and no setWebDebuggingAccess(true) call was found.';
-
-  const action = await vscode.window.showWarningMessage(hint, ...actions);
-  if (action === 'Open WebView Docs') {
-    await vscode.env.openExternal(vscode.Uri.parse(WEBVIEW_DEVTOOLS_DOC_URL));
-  } else if (action === 'Open module.json5' && projectState?.moduleJsonUri) {
-    await vscode.commands.executeCommand('vscode.open', projectState.moduleJsonUri);
-  }
 }
 
 async function explainMissingWebViewSocket(projectState?: WebViewDebugProjectState): Promise<void> {

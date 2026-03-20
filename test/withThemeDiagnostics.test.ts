@@ -39,4 +39,19 @@ describe('withThemeDiagnostics', () => {
 
     expect(findWithThemeColorModeUsages(code)).toHaveLength(0);
   });
+
+  it('should ignore light-only colorMode overrides', () => {
+    const code = [
+      '@Component',
+      'struct ThemedPage {',
+      '  build() {',
+      '    WithTheme({ colorMode: ThemeColorMode.LIGHT }) {',
+      '      Text("light")',
+      '    }',
+      '  }',
+      '}',
+    ].join('\n');
+
+    expect(findWithThemeColorModeUsages(code)).toHaveLength(0);
+  });
 });

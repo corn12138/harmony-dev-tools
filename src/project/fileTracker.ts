@@ -161,6 +161,7 @@ export function summarizeTrackedFiles(rootPath: string, files: HarmonyTrackedFil
 export class HarmonyProjectFileTracker implements vscode.Disposable {
   private readonly disposables: vscode.Disposable[] = [];
   private index?: HarmonyProjectFileIndex;
+  private rebuildVersion = 0;
 
   constructor(
     private readonly rootUri: vscode.Uri,
@@ -176,6 +177,7 @@ export class HarmonyProjectFileTracker implements vscode.Disposable {
   }
 
   async rebuild(): Promise<HarmonyProjectFileIndex> {
+    const rebuildVersion = ++this.rebuildVersion;
     const fileMap = new Map<string, HarmonyTrackedFile>();
 
     for (const pattern of TRACKED_PATTERNS) {
@@ -183,6 +185,9 @@ export class HarmonyProjectFileTracker implements vscode.Disposable {
         new vscode.RelativePattern(this.rootUri, pattern),
         '**/node_modules/**'
       );
+      if (!this.isLatestRebuild(rebuildVersion)) {
+        return this.index ?? summarizeTrackedFiles(this.rootUri.fsPath, Array.from(fileMap.values()));
+      }
 
       for (const uri of matches) {
         const tracked = classifyHarmonyFile(this.rootUri.fsPath, uri.fsPath);
@@ -192,7 +197,12 @@ export class HarmonyProjectFileTracker implements vscode.Disposable {
       }
     }
 
-    this.index = summarizeTrackedFiles(this.rootUri.fsPath, Array.from(fileMap.values()));
+    const nextIndex = summarizeTrackedFiles(this.rootUri.fsPath, Array.from(fileMap.values()));
+    if (!this.isLatestRebuild(rebuildVersion)) {
+      return this.index ?? nextIndex;
+    }
+
+    this.index = nextIndex;
     this.eventBus?.emit('project:indexUpdated', this.index);
     return this.index;
   }
@@ -230,5 +240,9 @@ export class HarmonyProjectFileTracker implements vscode.Disposable {
     }
 
     await this.rebuild();
+  }
+
+  private isLatestRebuild(rebuildVersion: number): boolean {
+    return rebuildVersion === this.rebuildVersion;
   }
 }
