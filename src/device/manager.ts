@@ -3,6 +3,7 @@ import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { ensureConnectedDevice, explainDeviceConnectionIssue, getConnectedDeviceState } from './devices';
 import { findBuiltHapFiles, readBundleName, readEntryAbility } from '../utils/projectMetadata';
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
+import { quoteShellArg } from '../utils/shell';
 
 export async function runOnDevice(): Promise<void> {
   const selected = await ensureConnectedDevice({ placeHolder: 'Select a device to run on' });
@@ -47,8 +48,10 @@ export async function runOnDevice(): Promise<void> {
               readEntryAbility(folder.uri),
             ]);
             if (bundleName) {
+              const safeAbility = quoteShellArg(abilityName || 'EntryAbility');
+              const safeBundle = quoteShellArg(bundleName);
               await execHdc(
-                [...buildHdcTargetArgs(selected.id), 'shell', `aa start -a ${abilityName || 'EntryAbility'} -b ${bundleName}`],
+                [...buildHdcTargetArgs(selected.id), 'shell', `aa start -a ${safeAbility} -b ${safeBundle}`],
                 { timeout: 10_000 }
               );
             }
@@ -88,7 +91,7 @@ export async function installHap(): Promise<void> {
   if (!selected) return;
 
   try {
-    await execHdc([...buildHdcTargetArgs(selected.id), 'install', hapFile[0].fsPath]);
+    await execHdc([...buildHdcTargetArgs(selected.id), 'install', hapFile[0].fsPath], { timeout: 30_000 });
     vscode.window.showInformationMessage(`HAP installed on ${selected.id}`);
   } catch (err) {
     vscode.window.showErrorMessage(`Install failed: ${err}`);

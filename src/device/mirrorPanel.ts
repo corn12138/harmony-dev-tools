@@ -58,31 +58,35 @@ export async function openDeviceMirror(deviceId?: string): Promise<void> {
   });
 
   panel.webview.onDidReceiveMessage(async (msg) => {
-    switch (msg.command) {
-      case 'touch':
-        await sendTouchInput(msg.x, msg.y, currentDeviceId);
-        break;
-      case 'swipe':
-        await sendSwipeInput(msg.x1, msg.y1, msg.x2, msg.y2, msg.duration, currentDeviceId);
-        break;
-      case 'longpress':
-        await sendLongPress(msg.x, msg.y, msg.duration, currentDeviceId);
-        break;
-      case 'key':
-        await sendKeyEvent(msg.key, currentDeviceId);
-        break;
-      case 'startStream':
-        startStreaming(msg.fps || 2);
-        break;
-      case 'stopStream':
-        stopStreaming();
-        break;
-      case 'setFps':
-        setStreamFps(msg.fps);
-        break;
-      case 'refresh':
-        await pushFrame();
-        break;
+    try {
+      switch (msg.command) {
+        case 'touch':
+          await sendTouchInput(msg.x, msg.y, currentDeviceId);
+          break;
+        case 'swipe':
+          await sendSwipeInput(msg.x1, msg.y1, msg.x2, msg.y2, msg.duration, currentDeviceId);
+          break;
+        case 'longpress':
+          await sendLongPress(msg.x, msg.y, msg.duration, currentDeviceId);
+          break;
+        case 'key':
+          await sendKeyEvent(msg.key, currentDeviceId);
+          break;
+        case 'startStream':
+          startStreaming(msg.fps || 2);
+          break;
+        case 'stopStream':
+          stopStreaming();
+          break;
+        case 'setFps':
+          setStreamFps(msg.fps);
+          break;
+        case 'refresh':
+          await pushFrame();
+          break;
+      }
+    } catch (err) {
+      console.error('[Mirror] Command failed:', err);
     }
   });
 

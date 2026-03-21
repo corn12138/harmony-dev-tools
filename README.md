@@ -6,24 +6,37 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
 > Core goal / 核心目标：hide HDC, hvigor, config migration, and device-targeting complexity behind a simpler VS Code workflow.
 > 把 HDC、hvigor、配置迁移、多设备选择这些复杂度收进插件里，让用户尽量只关心“选设备、点运行、看结果”。
 
-## What's New in v0.6.13 / v0.6.13 新变化
+## What's New in v0.6.15 / v0.6.15 新变化
 
-`v0.6.13` is a stabilization release for the ArkWeb DevTools workflow after the new project-aware target picking landed.
-`v0.6.13` 是 ArkWeb DevTools 这条链路的一次稳定性版本，重点是把新的一键猜页面能力压到更稳。
+`v0.6.15` is a comprehensive stability and security hardening release based on a full-codebase stress-test audit.
+`v0.6.15` 是一次基于全代码库极限压测的综合稳定性与安全加固版本。
 
-- **More resilient target opening / 更稳的目标页直达**
-  - malformed `devtoolsFrontendUrl` or `webSocketDebuggerUrl` payloads no longer break the direct-open flow
-  - 即便设备返回了畸形的 `devtoolsFrontendUrl` 或 `webSocketDebuggerUrl`，直达页面链路也不会再被打断
-  - absolute frontend URLs are now rewritten back to the current USB or wireless endpoint host before opening
-  - 绝对地址的 frontend URL 现在会重写回当前 USB / 无线端点 host，再去打开
-- **Stronger device-address parsing / 更稳的设备地址解析**
-  - IPv6 addresses with zone suffixes such as `%wlan0` are now normalized correctly for wireless WebView debugging
-  - 带 `%wlan0` 这类 zone suffix 的 IPv6 地址，现在也能被正确标准化并用于无线 WebView 调试
-- **Harder boundary coverage / 更硬的边界覆盖**
-  - added regression coverage for long multiline `Web({ ... src: ... })` blocks, malformed DevTools payloads, title-only mismatches, and IPv6 zone-suffix parsing
-  - 补了长多行 `Web({ ... src: ... })`、畸形 DevTools 目标、仅标题命中误判、IPv6 zone-suffix 解析等回归用例
+- **Critical bug fixes / 关键 bug 修复**
+  - fixed project config diagnostics silently discarding all remaining workspace folders when one snapshot was stale (`return` → `continue`)
+  - 修复了项目配置诊断在遇到过期快照时静默丢弃所有后续工作区文件夹的诊断信息
+  - added circular-dependency detection in module activation to prevent infinite recursion stack overflow
+  - 模块激活新增循环依赖检测，防止无限递归导致栈溢出
+  - fixed process-reference race condition in log viewer that could orphan `hilog` processes
+  - 修复了日志查看器中的进程引用竞态条件，避免 `hilog` 进程变成孤儿
+- **Security hardening / 安全加固**
+  - shell-escaped all `bundleName` and `abilityName` parameters in `aa start` commands to prevent command injection
+  - 对所有 `aa start` 命令中的 `bundleName` 和 `abilityName` 参数做了 shell 转义，防止命令注入
+  - hardened Windows shell quoting to escape `%`, `^`, `&`, `|`, `<`, `>`, `!` characters
+  - 加固了 Windows shell 引号转义，覆盖 `%^&|<>!` 等特殊字符
+- **Resource & memory leak fixes / 资源和内存泄漏修复**
+  - fixed `Logger` config listener leak, `EventEmitter` leak in public API, and `ResourceIndexer` stale singleton after dispose
+  - 修复了 Logger 配置监听器泄漏、公共 API 中 EventEmitter 泄漏、ResourceIndexer dispose 后单例失效
+- **Parser robustness / 解析器健壮性**
+  - `extractBuildBlocks` and `extractBlock` now correctly skip braces inside string literals and comments
+  - `extractBuildBlocks` 和 `extractBlock` 现在能正确跳过字符串和注释中的花括号
+  - hex color regex now strictly matches 6 or 8 digits; named color matching respects word boundaries
+  - 十六进制颜色正则现在严格匹配 6 或 8 位；命名颜色匹配尊重单词边界
+  - CodeLens column numbers now use raw lines instead of trimmed lines for accurate navigation
+  - CodeLens 列号现在使用原始行而非 trim 后的行，确保跳转准确
+- **Test coverage / 测试覆盖** — added 49 new test cases across core, utils, and language modules (565 → 629 total)
+  补充了 49 个新测试用例，覆盖核心微内核、工具函数和语言特性模块
 
-## How to Use v0.6.13 / v0.6.13 怎么用
+## How to Use v0.6.15 / v0.6.15 怎么用
 
 ### Fastest workflow / 最快上手方式
 

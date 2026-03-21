@@ -28,6 +28,7 @@ type EventKey = keyof HarmonyEvents;
 export class HarmonyEventBus implements vscode.Disposable {
   private emitters = new Map<string, vscode.EventEmitter<any>>();
   private disposables: vscode.Disposable[] = [];
+  private patternListeners: Array<{ prefix: string; listener: (event: string, data: any) => void; disposed: boolean }> = [];
 
   on<K extends EventKey>(
     event: K,
@@ -48,15 +49,25 @@ export class HarmonyEventBus implements vscode.Disposable {
     listener: (event: string, data: any) => void
   ): vscode.Disposable {
     const prefix = pattern.replace('*', '');
-    const disposables: vscode.Disposable[] = [];
+    const childDisposables: vscode.Disposable[] = [];
 
     for (const [key, emitter] of this.emitters) {
       if (key.startsWith(prefix)) {
-        disposables.push(emitter.event((data) => listener(key, data)));
+        childDisposables.push(emitter.event((data) => listener(key, data)));
       }
     }
 
-    const disposable = vscode.Disposable.from(...disposables);
+    const entry = { prefix, listener, disposed: false };
+    this.patternListeners.push(entry);
+
+    const disposable = {
+      dispose: () => {
+        entry.disposed = true;
+        childDisposables.forEach((d) => d.dispose());
+        const idx = this.patternListeners.indexOf(entry);
+        if (idx >= 0) this.patternListeners.splice(idx, 1);
+      },
+    };
     this.disposables.push(disposable);
     return disposable;
   }
@@ -66,6 +77,13 @@ export class HarmonyEventBus implements vscode.Disposable {
     if (!emitter) {
       emitter = new vscode.EventEmitter();
       this.emitters.set(event, emitter);
+
+      for (const entry of this.patternListeners) {
+        if (!entry.disposed && event.startsWith(entry.prefix)) {
+          const sub = emitter.event((data) => entry.listener(event, data));
+          this.disposables.push(sub);
+        }
+      }
     }
     return emitter;
   }
@@ -74,6 +92,7 @@ export class HarmonyEventBus implements vscode.Disposable {
     this.disposables.forEach((d) => d.dispose());
     this.emitters.forEach((e) => e.dispose());
     this.emitters.clear();
+    this.patternListeners.length = 0;
   }
 }
 

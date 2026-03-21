@@ -218,6 +218,12 @@ export async function launchEmulator(preferredName?: string): Promise<void> {
 
 async function startEmulatorProcess(binary: string, emulator: EmulatorInfo): Promise<void> {
   try {
+    if (runningProcess) {
+      runningProcess.kill();
+      runningProcess = undefined;
+      runningEmulatorSession = undefined;
+    }
+
     const baselineTargets: string[] = await listHdcTargets(3000).catch(() => []);
     runningEmulatorSession = { name: emulator.name };
 
@@ -245,7 +251,16 @@ async function startEmulatorProcess(binary: string, emulator: EmulatorInfo): Pro
         });
 
         for (let i = 0; i < 30; i++) {
-          if (token.isCancellationRequested) return;
+          if (token.isCancellationRequested) {
+            runningProcess?.kill();
+            runningProcess = undefined;
+            runningEmulatorSession = undefined;
+            return;
+          }
+          if (!runningProcess) {
+            vscode.window.showErrorMessage('Emulator process exited unexpectedly.');
+            return;
+          }
           await sleep(2000);
           try {
             const onlineTargets = await listHdcTargets(3000);

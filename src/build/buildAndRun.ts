@@ -9,6 +9,7 @@ import { findBuiltHapFiles, readBundleName, readEntryAbility } from '../utils/pr
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 import { ensureConnectedDevice } from '../device/devices';
 import { resolveSigningProfileInfo, syncAppBundleNameToSigningProfile } from '../project/signingProfile';
+import { quoteShellArg } from '../utils/shell';
 
 const execAsync = promisify(exec);
 let buildOutputChannel: vscode.OutputChannel | undefined;
@@ -311,9 +312,10 @@ async function launchApp(device: string, rootUri: vscode.Uri): Promise<boolean> 
   const fullAbility = abilityName || 'EntryAbility';
 
   try {
-    // aa start -a <abilityName> -b <bundleName>
+    const safeAbility = quoteShellArg(fullAbility);
+    const safeBundle = quoteShellArg(bundleName);
     await execHdc(
-      [...buildHdcTargetArgs(device), 'shell', `aa start -a ${fullAbility} -b ${bundleName}`],
+      [...buildHdcTargetArgs(device), 'shell', `aa start -a ${safeAbility} -b ${safeBundle}`],
       { timeout: 10_000 }
     );
     return true;

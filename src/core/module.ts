@@ -21,6 +21,7 @@ export interface HarmonyModule {
 export class ModuleManager implements vscode.Disposable {
   private modules = new Map<string, HarmonyModule>();
   private activated = new Set<string>();
+  private activating = new Set<string>();
   private context: ModuleContext;
 
   constructor(context: ModuleContext) {
@@ -34,24 +35,31 @@ export class ModuleManager implements vscode.Disposable {
   async activate(moduleId: string): Promise<void> {
     if (this.activated.has(moduleId)) return;
 
+    if (this.activating.has(moduleId)) {
+      this.context.logger.error(`Circular dependency detected for module "${moduleId}"`);
+      return;
+    }
+
     const mod = this.modules.get(moduleId);
     if (!mod) {
       this.context.logger.warn(`Module "${moduleId}" not found`);
       return;
     }
 
-    // Activate dependencies first
-    for (const dep of mod.dependencies ?? []) {
-      await this.activate(dep);
-    }
-
+    this.activating.add(moduleId);
     try {
+      for (const dep of mod.dependencies ?? []) {
+        await this.activate(dep);
+      }
+
       await mod.activate(this.context);
       this.activated.add(moduleId);
       this.context.eventBus.emit('extension:activated', { id: moduleId });
       this.context.logger.info(`Module "${moduleId}" activated`);
     } catch (err) {
       this.context.logger.error(`Failed to activate module "${moduleId}": ${err}`);
+    } finally {
+      this.activating.delete(moduleId);
     }
   }
 
@@ -83,8 +91,11 @@ export class ModuleManager implements vscode.Disposable {
   }
 
   dispose(): void {
-    // deactivateAll should be called explicitly before dispose
+    if (this.activated.size > 0) {
+      void this.deactivateAll();
+    }
     this.modules.clear();
     this.activated.clear();
+    this.activating.clear();
   }
 }

@@ -183,6 +183,9 @@ export class ResourceIndexer implements vscode.Disposable {
     this.resources.clear();
     this.initialized = false;
     this.initializing = undefined;
+    if (_instance === this) {
+      _instance = undefined;
+    }
   }
 }
 

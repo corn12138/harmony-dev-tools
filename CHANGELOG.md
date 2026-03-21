@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.6.15] - 2026-03-21
+- Fixed a critical bug in project config diagnostics where `return` was used instead of `continue`, causing all remaining workspace folders' diagnostics to be silently discarded when one snapshot was stale.
+- Added circular-dependency detection in `ModuleManager.activate()` to prevent infinite recursion and stack overflow when modules reference each other.
+- Fixed a process-reference race condition in the log viewer where a rapidly restarted `hilog` stream could orphan the old process and lose the reference to the new one.
+- Hardened `quoteShellArg` on Windows to escape `%`, `^`, `&`, `|`, `<`, `>`, `!` and `"` characters, closing a command-injection vector in shell argument quoting.
+- Shell-escaped `bundleName` and `abilityName` parameters in `aa start` commands across `manager.ts`, `buildAndRun.ts`, and `terminalRunner.ts` to prevent command injection from malformed project metadata.
+- Fixed `emulatorManager` process-singleton overwrite by killing any running emulator before spawning a new one, and added early exit on user cancellation or unexpected process crash.
+- Rewrote `EventBus.onPattern()` to capture events from emitters created after the pattern subscription, fixing a functional gap where wildcard listeners missed future event channels.
+- Fixed `colorProvider` hex-color regex to strictly match 6 or 8 hex digits, preventing silent misparse of 7-digit hex values; added word-boundary checks for named colors like `Color.Grey` to avoid false matches on `Color.Greyish`.
+- Fixed `codeLensProvider` column-number calculations to use raw (untrimmed) lines, so `Find References` and `@Builder` usage lenses now jump to the correct column; relaxed `@Component` / `@Entry` regex to match decorator-with-parameters syntax.
+- Fixed a memory leak in `Logger` where the `onDidChangeConfiguration` listener was never disposed; added runtime validation so an invalid `logLevel` setting falls back to `'info'` instead of silently dropping all log output.
+- Added `dispose()` to the public API object so the internal `deviceChangedEmitter` and its two event subscriptions are properly cleaned up on extension deactivation.
+- Wrapped `takeDeviceScreenshot` and `mirrorPanel` message handlers in `try/catch` to prevent unhandled promise rejections from crashing the extension when a device disconnects mid-operation.
+- Reset the `ResourceIndexer` singleton reference on `dispose()`, so a subsequent `getResourceIndexer()` call returns a fresh, functional instance instead of a stale one with dead file watchers.
+- Rewrote `extractBuildBlocks` (diagnosticProvider) and `extractBlock` (perfLens) to track string literals, line comments, and block comments when counting braces, preventing `Text("{")` patterns from breaking build-block boundary detection.
+- Added block-comment state tracking in `checkStrictTypes` so multi-line `/* */` comments containing `: any` or `ForEach` no longer trigger false diagnostics.
+- Added `response.on('error', reject)` to the WebView targets HTTP helper to prevent unhandled stream errors when a connection drops mid-transfer.
+- Added 49 new test cases across 3 new test files (`core.test.ts`, `shellAndLogger.test.ts`, `colorAndCodeLens.test.ts`) covering EventBus pattern matching, ModuleManager circular dependencies, Registry lifecycle, shell quoting on both platforms, Logger level filtering, hex/named color parsing, and CodeLens column accuracy.
+
 ## [0.6.14] - 2026-03-20
 - Removed the static `setWebDebuggingAccess(true)` hard gate from the WebView DevTools command, so valid running targets can still be discovered through runtime ArkWeb sockets even when code scanning misses the enablement call.
 - Narrowed `WithTheme({ colorMode: ... })` dark-resource diagnostics to skip light-only overrides, eliminating a false warning for valid `ThemeColorMode.LIGHT` usage.

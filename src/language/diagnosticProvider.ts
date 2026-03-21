@@ -262,13 +262,23 @@ function analyzeDocument(doc: vscode.TextDocument, projectApiLevel?: number, con
 
 function checkStrictTypes(lines: string[]): RawDiagnostic[] {
   const diags: RawDiagnostic[] = [];
+  let inBlockComment = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-
-    // Skip single-line comments and strings
     const trimmed = line.trim();
-    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) continue;
+
+    if (inBlockComment) {
+      if (trimmed.includes('*/')) {
+        inBlockComment = false;
+      }
+      continue;
+    }
+    if (trimmed.startsWith('/*')) {
+      if (!trimmed.includes('*/')) inBlockComment = true;
+      continue;
+    }
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
     // `: any` or `: unknown` type annotation
     const anyAnnotation = line.match(/:\s*(any|unknown)\b/);
@@ -604,13 +614,40 @@ export function extractBuildBlocks(text: string): BuildBlock[] {
       let started = false;
       const blockLines: string[] = [];
       const startLine = i;
+      let inString: string | null = null;
+      let inLineComment = false;
+      let inBlockComment = false;
+      let escaped = false;
 
       for (let j = i; j < lines.length; j++) {
-        for (const ch of lines[j]) {
+        const ln = lines[j];
+        inLineComment = false;
+
+        for (let k = 0; k < ln.length; k++) {
+          const ch = ln[k];
+
+          if (escaped) { escaped = false; continue; }
+          if (ch === '\\' && inString) { escaped = true; continue; }
+
+          if (inBlockComment) {
+            if (ch === '*' && ln[k + 1] === '/') { inBlockComment = false; k++; }
+            continue;
+          }
+          if (inLineComment) continue;
+
+          if (inString) {
+            if (ch === inString) inString = null;
+            continue;
+          }
+
+          if (ch === '/' && ln[k + 1] === '/') { inLineComment = true; continue; }
+          if (ch === '/' && ln[k + 1] === '*') { inBlockComment = true; k++; continue; }
+          if (ch === '"' || ch === '\'' || ch === '`') { inString = ch; continue; }
+
           if (ch === '{') { depth++; started = true; }
           if (ch === '}') depth--;
         }
-        blockLines.push(lines[j]);
+        blockLines.push(ln);
         if (started && depth === 0) break;
       }
 

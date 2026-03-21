@@ -242,6 +242,7 @@ function requestText(urlString: string, timeout: number): Promise<string> {
       response.on('end', () => {
         resolve(body);
       });
+      response.on('error', reject);
     });
 
     request.setTimeout(timeout, () => {

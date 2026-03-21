@@ -46,6 +46,7 @@ export function activate(context: vscode.ExtensionContext): HarmonyDevToolsAPI {
 
   // ---- Public API ----
   const api = createPublicAPI(registry, eventBus);
+  context.subscriptions.push(api);
   logger.info('HarmonyOS Dev Tools activated');
   return api;
 }

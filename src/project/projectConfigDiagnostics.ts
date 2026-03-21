@@ -1202,7 +1202,7 @@ export function createProjectConfigDiagnosticProvider(context: vscode.ExtensionC
 
       for (const entry of snapshots) {
         if (!entry.snapshot) {
-          return;
+          continue;
         }
         const previousUris = managedWorkspaceUris.get(entry.folderKey) ?? new Set<string>();
         const nextUris = applyWorkspaceSnapshot(collection, previousUris, entry.snapshot);

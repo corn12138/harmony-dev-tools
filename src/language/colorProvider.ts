@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const HEX_COLOR_REGEX = /'#([0-9a-fA-F]{6,8})'/g;
+const HEX_COLOR_REGEX = /'#([0-9a-fA-F]{8}|[0-9a-fA-F]{6})'/g;
 const NAMED_COLORS: Record<string, [number, number, number, number]> = {
   'Color.White': [1, 1, 1, 1],
   'Color.Black': [0, 0, 0, 1],
@@ -52,13 +52,18 @@ export function provideDocumentColors(
   for (const [name, [r, g, b, a]] of Object.entries(NAMED_COLORS)) {
     let idx = text.indexOf(name);
     while (idx !== -1) {
+      const afterIdx = idx + name.length;
+      if (afterIdx < text.length && /\w/.test(text[afterIdx])) {
+        idx = text.indexOf(name, afterIdx);
+        continue;
+      }
       const startPos = document.positionAt(idx);
-      const endPos = document.positionAt(idx + name.length);
+      const endPos = document.positionAt(afterIdx);
       colors.push(new vscode.ColorInformation(
         new vscode.Range(startPos, endPos),
         new vscode.Color(r, g, b, a)
       ));
-      idx = text.indexOf(name, idx + name.length);
+      idx = text.indexOf(name, afterIdx);
     }
   }
 

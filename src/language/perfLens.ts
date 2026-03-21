@@ -144,13 +144,31 @@ class PerfCodeLensProvider implements vscode.CodeLensProvider {
     let depth = 0;
     let started = false;
     const blockLines: string[] = [];
+    let inString: string | null = null;
+    let inBlockComment = false;
+    let escaped = false;
 
     for (let j = startIdx; j < lines.length; j++) {
-      for (const ch of lines[j]) {
+      const ln = lines[j];
+      let inLineComment = false;
+
+      for (let k = 0; k < ln.length; k++) {
+        const ch = ln[k];
+        if (escaped) { escaped = false; continue; }
+        if (ch === '\\' && inString) { escaped = true; continue; }
+        if (inBlockComment) {
+          if (ch === '*' && ln[k + 1] === '/') { inBlockComment = false; k++; }
+          continue;
+        }
+        if (inLineComment) continue;
+        if (inString) { if (ch === inString) inString = null; continue; }
+        if (ch === '/' && ln[k + 1] === '/') { inLineComment = true; continue; }
+        if (ch === '/' && ln[k + 1] === '*') { inBlockComment = true; k++; continue; }
+        if (ch === '"' || ch === '\'' || ch === '`') { inString = ch; continue; }
         if (ch === '{') { depth++; started = true; }
         if (ch === '}') depth--;
       }
-      blockLines.push(lines[j]);
+      blockLines.push(ln);
       if (started && depth === 0) break;
     }
 

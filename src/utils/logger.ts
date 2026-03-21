@@ -12,15 +12,15 @@ const LOG_LEVELS: Record<LogLevel, number> = {
 export class Logger implements vscode.Disposable {
   private channel: vscode.OutputChannel;
   private level: LogLevel;
+  private configDisposable: vscode.Disposable;
 
   constructor(name: string = 'HarmonyOS') {
     this.channel = vscode.window.createOutputChannel(name);
-    this.level = vscode.workspace.getConfiguration('harmony').get<LogLevel>('logLevel', 'info');
+    this.level = validateLogLevel(vscode.workspace.getConfiguration('harmony').get<string>('logLevel', 'info'));
 
-    // Watch for config changes
-    vscode.workspace.onDidChangeConfiguration((e) => {
+    this.configDisposable = vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('harmony.logLevel')) {
-        this.level = vscode.workspace.getConfiguration('harmony').get<LogLevel>('logLevel', 'info');
+        this.level = validateLogLevel(vscode.workspace.getConfiguration('harmony').get<string>('logLevel', 'info'));
       }
     });
   }
@@ -55,6 +55,11 @@ export class Logger implements vscode.Disposable {
   }
 
   dispose(): void {
+    this.configDisposable.dispose();
     this.channel.dispose();
   }
+}
+
+function validateLogLevel(raw: string): LogLevel {
+  return raw in LOG_LEVELS ? raw as LogLevel : 'info';
 }

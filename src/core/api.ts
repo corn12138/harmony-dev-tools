@@ -111,10 +111,10 @@ export interface HarmonyDevToolsAPI {
 export function createPublicAPI(
   registry: HarmonyRegistry,
   eventBus: HarmonyEventBus
-): HarmonyDevToolsAPI {
+): HarmonyDevToolsAPI & vscode.Disposable {
   const deviceChangedEmitter = new vscode.EventEmitter<DeviceChangeEvent>();
 
-  eventBus.on('device:connected', (device) => {
+  const sub1 = eventBus.on('device:connected', (device) => {
     deviceChangedEmitter.fire({
       ...device,
       status: 'online',
@@ -122,7 +122,7 @@ export function createPublicAPI(
     });
   });
 
-  eventBus.on('device:disconnected', (device) => {
+  const sub2 = eventBus.on('device:disconnected', (device) => {
     deviceChangedEmitter.fire({
       id: device.id,
       status: 'offline',
@@ -131,6 +131,11 @@ export function createPublicAPI(
   });
 
   return {
+    dispose(): void {
+      sub1.dispose();
+      sub2.dispose();
+      deviceChangedEmitter.dispose();
+    },
     apiVersion: 1,
 
     registerSnippetContributor: (c) => registry.register(ExtensionPoints.SNIPPET, c),

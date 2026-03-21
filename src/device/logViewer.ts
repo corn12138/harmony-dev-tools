@@ -28,19 +28,22 @@ export async function viewLogs(deviceArg?: unknown): Promise<void> {
     }
 
     outputChannel.appendLine(`[Target] ${device.id}`);
-    logProcess = await spawnHdc([...buildHdcTargetArgs(device.id), 'hilog'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const proc = await spawnHdc([...buildHdcTargetArgs(device.id), 'hilog'], { stdio: ['ignore', 'pipe', 'pipe'] });
+    logProcess = proc;
 
-    logProcess.stdout?.on('data', (data: Buffer) => {
+    proc.stdout?.on('data', (data: Buffer) => {
       outputChannel?.append(data.toString());
     });
 
-    logProcess.stderr?.on('data', (data: Buffer) => {
+    proc.stderr?.on('data', (data: Buffer) => {
       outputChannel?.append(`[ERROR] ${data.toString()}`);
     });
 
-    logProcess.on('close', () => {
+    proc.on('close', () => {
       outputChannel?.appendLine('[Log stream ended]');
-      logProcess = null;
+      if (logProcess === proc) {
+        logProcess = null;
+      }
     });
   } catch (err) {
     vscode.window.showErrorMessage(`Failed to start log viewer: ${err}`);
