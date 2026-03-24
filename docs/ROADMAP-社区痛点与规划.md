@@ -32,11 +32,11 @@
 
 **本插件已做 / 可加强：**
 
-- ✅ **70+ 代码片段**：comp、entry、compv2、list、navstack 等
-- ✅ **装饰器/组件补全 + 悬浮文档**：30+ 装饰器、85+ 组件
+- ✅ **80+ 代码片段**：comp、entry、compv2、list、navstack、listpage、detailpage、loginpage、emptystate、fileio 等
+- ✅ **装饰器/组件补全 + 悬浮文档**：30+ 装饰器、100+ 组件（含 API 20 新增）
 - ✅ **配置键悬浮文档**：build-profile、module、app、oh-package
 - ✅ **搜索官方文档**：HarmonyOS: Search HarmonyOS Docs
-- 🔲 **更多页面级片段**：列表页、Tab 页、详情页、空状态等「一整页」骨架
+- ✅ **页面级骨架片段**：列表页（listpage）、详情页（detailpage）、登录页（loginpage）、空状态（emptystate）
 - 🔲 **RelativeContainer 辅助**：ID 补全、常用对齐规则片段、简单校验（可选）
 
 ---
@@ -91,6 +91,8 @@
 - ✅ **状态陷阱诊断**：@State 复杂对象、@Link 在 V2 等
 - ✅ **Quick Fix**：any→具体类型、ForEach→LazyForEach、迁移建议
 - ✅ **悬浮文档**：装饰器、配置键中英文说明
+- ✅ **废弃 router 检测**：`import router from '@ohos.router'` → 建议 Navigation + NavPathStack
+- ✅ **沙盒文件系统反模式检测**：硬编码 /data/、/storage/ 路径 → 建议 getContext().filesDir
 - 🔲 **「为什么这样写」简短说明**：在 hover 或 CodeLens 里加 1 句「传值/传址」「V1/V2 区别」（可逐步加）
 - 🔲 **学习路径/速查**：命令或面板打开「ArkTS 速查」「状态管理对照表」等（链接到官方或自建 doc）
 

@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-03-24
+
+> Summary: HarmonyOS 6 ecosystem alignment, Cangjie language support, and comprehensive stress testing.
+> 摘要：对齐 HarmonyOS 6 生态、新增仓颉语言支持、全覆盖极限压测。
+
+### Added
+- **Cangjie (仓颉) Language Support**:
+  - TextMate grammar for `.cj` files with syntax highlighting for 60+ keywords, built-in types, annotations, string interpolation, and nested block comments
+  - Language configuration with bracket matching, auto-closing pairs, comment toggling, and indentation rules
+  - 17 code snippets: `main`, `func`, `class`, `struct`, `enum`, `interface`, `match`, `let`, `var`, `spawn`, `for`, `while`, `trycatch`, `import`, `println`, `extend`, `prop`
+- **HarmonyOS 6 (API 20) Metadata**:
+  - 9 new components: `Repeat`, `RepeatItem`, `UIExtensionComponent`, `EmbeddedUIExtensionComponent`, `FoldSplitContainer`, `MediaCachedImage`, `ScrollBar`, `ExpandableTitle`
+  - `@Track` decorator for V1 fine-grained state tracking (API 12+)
+- **Page-Level Scaffolding Snippets**:
+  - `listpage` — full list page with Navigation + Refresh + ForEach
+  - `detailpage` — detail page with NavDestination + Scroll layout
+  - `loginpage` — login page with form, validation, and submit logic
+  - `emptystate` — empty state placeholder component
+  - `fileio` — sandbox-safe file I/O using Core File Kit
+  - `navdest` — NavDestination route target
+  - `symbolglyph`, `mediacachedimg`, `foldsplit`, `track` — HarmonyOS 6 component snippets
+- **Diagnostic Rules**:
+  - `DEPRECATED_ROUTER`: detects `import router from '@ohos.router'` and all `router.*()` calls, suggests Navigation + NavPathStack migration
+  - `SANDBOX_HARDCODED_PATH`: detects hardcoded `/data/storage/`, `/data/el1/`, `/data/el2/`, `/storage/` paths, suggests `getContext().filesDir`
+  - Quick Fix for both rules: one-click open official HarmonyOS documentation
+- **172 New Stress Tests** (total 821):
+  - `stressBoundary.test.ts` (131 tests): diagnostic boundary (empty files, 10K lines, Unicode), router/sandbox path exhaustive coverage, metadata API boundary, snippet integrity, Cangjie grammar/config validation
+  - `stressExtended.test.ts` (41 tests): CodeFix diagnostic details, completion provider new entries, ArkTS grammar, cross-cutting multi-rule combinations, 10K-line performance benchmark, metadata caching, snippet isolation, Cangjie regex robustness
+
+### Changed
+- Component metadata expanded from 90 to 99 entries (API 12–20 coverage)
+- Snippet count increased from 70+ to 80+ (ArkTS) + 17 (Cangjie)
+- ROADMAP updated to reflect completed v0.7.0 objectives
+
 ## [0.6.15] - 2026-03-21
 - Fixed a critical bug in project config diagnostics where `return` was used instead of `continue`, causing all remaining workspace folders' diagnostics to be silently discarded when one snapshot was stale.
 - Added circular-dependency detection in `ModuleManager.activate()` to prevent infinite recursion and stack overflow when modules reference each other.

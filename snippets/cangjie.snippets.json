@@ -1,0 +1,159 @@
+{
+  "Main Function": {
+    "prefix": "main",
+    "body": [
+      "main(): Int64 {",
+      "  $0",
+      "  return 0",
+      "}"
+    ],
+    "description": "Cangjie main entry function"
+  },
+  "Function": {
+    "prefix": "func",
+    "body": [
+      "func ${1:name}(${2:params}): ${3:Unit} {",
+      "  $0",
+      "}"
+    ],
+    "description": "Function definition"
+  },
+  "Class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:ClassName} {",
+      "  private var ${2:field}: ${3:String} = ${4:\"\"};",
+      "",
+      "  init(${2:field}: ${3:String}) {",
+      "    this.${2:field} = ${2:field}",
+      "  }",
+      "",
+      "  func ${5:method}(): ${6:Unit} {",
+      "    $0",
+      "  }",
+      "}"
+    ],
+    "description": "Class with constructor and method"
+  },
+  "Struct": {
+    "prefix": "struct",
+    "body": [
+      "struct ${1:StructName} {",
+      "  let ${2:field}: ${3:Int64}",
+      "  $0",
+      "}"
+    ],
+    "description": "Value type struct"
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "enum ${1:EnumName} {",
+      "  | ${2:Case1}",
+      "  | ${3:Case2}",
+      "  $0",
+      "}"
+    ],
+    "description": "Enum definition with cases"
+  },
+  "Interface": {
+    "prefix": "interface",
+    "body": [
+      "interface ${1:InterfaceName} {",
+      "  func ${2:method}(${3}): ${4:Unit}",
+      "  $0",
+      "}"
+    ],
+    "description": "Interface definition"
+  },
+  "Match Expression": {
+    "prefix": "match",
+    "body": [
+      "match (${1:value}) {",
+      "  case ${2:pattern1} => ${3:result1}",
+      "  case ${4:pattern2} => ${5:result2}",
+      "  case _ => ${6:defaultResult}",
+      "}"
+    ],
+    "description": "Pattern matching expression"
+  },
+  "Let Variable": {
+    "prefix": "let",
+    "body": "let ${1:name}: ${2:Int64} = ${3:0}",
+    "description": "Immutable variable declaration"
+  },
+  "Var Variable": {
+    "prefix": "var",
+    "body": "var ${1:name}: ${2:String} = ${3:\"\"}",
+    "description": "Mutable variable declaration"
+  },
+  "Spawn Concurrent": {
+    "prefix": "spawn",
+    "body": [
+      "spawn {",
+      "  $0",
+      "}"
+    ],
+    "description": "Spawn lightweight concurrent task"
+  },
+  "For-In Loop": {
+    "prefix": "for",
+    "body": [
+      "for (${1:item} in ${2:collection}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "For-in loop"
+  },
+  "While Loop": {
+    "prefix": "while",
+    "body": [
+      "while (${1:condition}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "While loop"
+  },
+  "Try-Catch": {
+    "prefix": "trycatch",
+    "body": [
+      "try {",
+      "  $1",
+      "} catch (e: ${2:Exception}) {",
+      "  $0",
+      "}"
+    ],
+    "description": "Try-catch exception handling"
+  },
+  "Import Package": {
+    "prefix": "import",
+    "body": "import ${1:std}.${2:collection}.*",
+    "description": "Import package"
+  },
+  "Println": {
+    "prefix": "println",
+    "body": "println(\"${1:message}\")",
+    "description": "Print line to stdout"
+  },
+  "Extend Type": {
+    "prefix": "extend",
+    "body": [
+      "extend ${1:TypeName} <: ${2:InterfaceName} {",
+      "  func ${3:method}(${4}): ${5:Unit} {",
+      "    $0",
+      "  }",
+      "}"
+    ],
+    "description": "Extend a type with interface implementation"
+  },
+  "Property": {
+    "prefix": "prop",
+    "body": [
+      "prop ${1:name}: ${2:String} {",
+      "  get() { ${3:_backing} }",
+      "  set(value) { ${3:_backing} = value }",
+      "}"
+    ],
+    "description": "Property with getter and setter"
+  }
+}

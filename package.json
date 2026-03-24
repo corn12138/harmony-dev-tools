@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Build, run, debug, inspect, and validate HarmonyOS apps directly in VS Code",
-  "version": "0.6.15",
+  "version": "0.7.0",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -55,6 +55,18 @@
           "light": "./resources/icons/arkts-light.svg",
           "dark": "./resources/icons/arkts-dark.svg"
         }
+      },
+      {
+        "id": "cangjie",
+        "aliases": [
+          "Cangjie",
+          "cangjie",
+          "仓颉"
+        ],
+        "extensions": [
+          ".cj"
+        ],
+        "configuration": "./cangjie-language-configuration.json"
       }
     ],
     "grammars": [
@@ -65,12 +77,21 @@
         "embeddedLanguages": {
           "meta.embedded.block.typescript": "typescript"
         }
+      },
+      {
+        "language": "cangjie",
+        "scopeName": "source.cangjie",
+        "path": "./syntaxes/cangjie.tmLanguage.json"
       }
     ],
     "snippets": [
       {
         "language": "arkts",
         "path": "./snippets/arkts.snippets.json"
+      },
+      {
+        "language": "cangjie",
+        "path": "./snippets/cangjie.snippets.json"
       }
     ],
     "jsonValidation": [

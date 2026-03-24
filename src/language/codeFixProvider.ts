@@ -72,6 +72,10 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
         return [];
       case DIAG_CODES.API_LEVEL:
         return this.fixApiLevel(document, diag);
+      case DIAG_CODES.DEPRECATED_ROUTER:
+        return this.fixDeprecatedRouter(diag);
+      case DIAG_CODES.SANDBOX_HARDCODED_PATH:
+        return this.fixSandboxPath(diag);
       default:
         return [];
     }
@@ -300,5 +304,35 @@ class ArkTSCodeFixProvider implements vscode.CodeActionProvider {
     actions.push(checkCompat);
 
     return actions;
+  }
+
+  private fixDeprecatedRouter(diag: vscode.Diagnostic): vscode.CodeAction[] {
+    const navDocs = new vscode.CodeAction(
+      '查看 Navigation + NavPathStack 路由迁移指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    navDocs.command = {
+      title: 'Open Navigation Docs',
+      command: 'harmony.openDocs',
+      arguments: ['Navigation NavPathStack'],
+    };
+    navDocs.diagnostics = [diag];
+
+    return [navDocs];
+  }
+
+  private fixSandboxPath(diag: vscode.Diagnostic): vscode.CodeAction[] {
+    const sandboxDocs = new vscode.CodeAction(
+      '查看 HarmonyOS 文件系统沙盒指南',
+      vscode.CodeActionKind.QuickFix,
+    );
+    sandboxDocs.command = {
+      title: 'Open File System Docs',
+      command: 'harmony.openDocs',
+      arguments: ['应用沙盒目录 文件系统'],
+    };
+    sandboxDocs.diagnostics = [diag];
+
+    return [sandboxDocs];
   }
 }

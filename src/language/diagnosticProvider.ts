@@ -23,6 +23,8 @@ export const DIAG_CODES = {
   FOREACH_PERF: 'arkts-foreach-perf',
   BUILD_HEAVY: 'arkts-build-heavy',
   API_LEVEL: 'arkts-api-level',
+  DEPRECATED_ROUTER: 'arkts-deprecated-router',
+  SANDBOX_HARDCODED_PATH: 'arkts-sandbox-hardcoded-path',
 } as const;
 
 export type DiagCode = (typeof DIAG_CODES)[keyof typeof DIAG_CODES];
@@ -234,6 +236,8 @@ export function analyzeText(text: string, projectApiLevel?: number, context: Ana
   diags.push(...checkCustomThemeShells(text));
   diags.push(...checkWithThemeDarkResources(text, context));
   diags.push(...checkPerformanceAntiPatterns(lines, text));
+  diags.push(...checkDeprecatedRouter(lines));
+  diags.push(...checkSandboxAntiPatterns(lines));
   if (projectApiLevel) {
     diags.push(...checkApiLevelUsage(lines, text, projectApiLevel));
   }
@@ -589,6 +593,110 @@ function checkApiLevelUsage(lines: string[], text: string, apiLevel: number): Ra
         severity: vscode.DiagnosticSeverity.Warning,
         code: DIAG_CODES.API_LEVEL,
       });
+    }
+  }
+
+  return diags;
+}
+
+// ---------------------------------------------------------------------------
+// Rule 5: Deprecated router module — suggest Navigation + NavPathStack
+// ---------------------------------------------------------------------------
+
+const DEPRECATED_ROUTER_IMPORT = /import\s+(?:\w+|\{[^}]+\})\s+from\s+['"]@ohos\.router['"]/;
+const DEPRECATED_ROUTER_CALL = /\brouter\.(pushUrl|replaceUrl|pushNamedRoute|replaceNamedRoute|back|clear|getLength|getParams|getState|showAlertBeforeBackPage|hideAlertBeforeBackPage)\s*\(/;
+
+function checkDeprecatedRouter(lines: string[]): RawDiagnostic[] {
+  const diags: RawDiagnostic[] = [];
+  let inBlockComment = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (inBlockComment) {
+      if (trimmed.includes('*/')) inBlockComment = false;
+      continue;
+    }
+    if (trimmed.startsWith('/*')) {
+      if (!trimmed.includes('*/')) inBlockComment = true;
+      continue;
+    }
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+
+    const importMatch = line.match(DEPRECATED_ROUTER_IMPORT);
+    if (importMatch && importMatch.index !== undefined) {
+      diags.push({
+        line: i,
+        colStart: importMatch.index,
+        colEnd: importMatch.index + importMatch[0].length,
+        message: '@ohos.router 已被官方标记为不推荐使用。建议迁移到 Navigation + NavPathStack 路由方案，性能更好且支持生命周期管理。',
+        severity: vscode.DiagnosticSeverity.Information,
+        code: DIAG_CODES.DEPRECATED_ROUTER,
+      });
+    }
+
+    const callMatch = line.match(DEPRECATED_ROUTER_CALL);
+    if (callMatch && callMatch.index !== undefined) {
+      diags.push({
+        line: i,
+        colStart: callMatch.index,
+        colEnd: callMatch.index + callMatch[0].length - 1,
+        message: `router.${callMatch[1]}() 已不推荐。建议使用 NavPathStack.pushPath() / replacePath() 替代，配合 Navigation 组件实现页面路由。`,
+        severity: vscode.DiagnosticSeverity.Information,
+        code: DIAG_CODES.DEPRECATED_ROUTER,
+      });
+    }
+  }
+
+  return diags;
+}
+
+// ---------------------------------------------------------------------------
+// Rule 6: Sandbox file system anti-patterns
+// ---------------------------------------------------------------------------
+
+const HARDCODED_PATH_PATTERNS: Array<{ pattern: RegExp; message: string }> = [
+  {
+    pattern: /['"`]\/data\/(?:storage|accounts|app|el[12])\/[^'"`]+['"`]/,
+    message: '检测到硬编码的 /data/ 路径。HarmonyOS 沙盒机制下，请使用 getContext().filesDir、cacheDir、tempDir 等沙盒 API 获取路径，避免因沙盒隔离导致文件访问失败。',
+  },
+  {
+    pattern: /['"`]\/storage\/[^'"`]+['"`]/,
+    message: '检测到硬编码的 /storage/ 路径。HarmonyOS 6 加强了沙盒安全边界，直接使用物理路径可能导致访问被拒。请使用 getContext().filesDir 或 File Picker 等安全 API。',
+  },
+];
+
+function checkSandboxAntiPatterns(lines: string[]): RawDiagnostic[] {
+  const diags: RawDiagnostic[] = [];
+  let inBlockComment = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (inBlockComment) {
+      if (trimmed.includes('*/')) inBlockComment = false;
+      continue;
+    }
+    if (trimmed.startsWith('/*')) {
+      if (!trimmed.includes('*/')) inBlockComment = true;
+      continue;
+    }
+    if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
+
+    for (const { pattern, message } of HARDCODED_PATH_PATTERNS) {
+      const match = line.match(pattern);
+      if (match && match.index !== undefined) {
+        diags.push({
+          line: i,
+          colStart: match.index,
+          colEnd: match.index + match[0].length,
+          message,
+          severity: vscode.DiagnosticSeverity.Warning,
+          code: DIAG_CODES.SANDBOX_HARDCODED_PATH,
+        });
+      }
     }
   }
 
