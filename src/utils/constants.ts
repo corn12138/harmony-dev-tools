@@ -11,6 +11,8 @@ export const CONFIG_FILES = {
 } as const;
 
 export const COMMANDS = {
+  EXPORT_AI_CONTEXT: 'harmony.exportAiContext',
+  CLEAN_ENTROPY: 'harmony.cleanEntropy',
   CREATE_PROJECT: 'harmony.createProject',
   OPEN_CONTROL_CENTER: 'harmony.openControlCenter',
   BUILD_HAP: 'harmony.buildHap',

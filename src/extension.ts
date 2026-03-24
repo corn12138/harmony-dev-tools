@@ -305,6 +305,16 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
     );
   };
 
+  lazyCommand(COMMANDS.EXPORT_AI_CONTEXT, async () => {
+    const { AiContextGenerator } = await import('./aiHarness/contextGenerator');
+    await AiContextGenerator.generateContext();
+  });
+
+  lazyCommand(COMMANDS.CLEAN_ENTROPY, async () => {
+    const { EntropySweeper } = await import('./resource/entropySweeper');
+    await EntropySweeper.sweepEntropy();
+  });
+
   lazyCommand(COMMANDS.CREATE_PROJECT, async () => {
     const { runProjectWizard } = await import('./project/wizard');
     await runProjectWizard();

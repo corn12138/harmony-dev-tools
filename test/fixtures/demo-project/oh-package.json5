@@ -1,0 +1,12 @@
+{
+  "name": "demo-project",
+  "version": "1.0.0",
+  "description": "Demo project for E2E testing",
+  "main": "",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@ohos/hypium": "1.0.6"
+  },
+  "devDependencies": {}
+}

@@ -4,6 +4,7 @@ import { detectHarmonySdkFromBuildProfile } from '../utils/harmonySdk';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { findReusableV2RepeatTemplateUsages } from './reusableV2RepeatDiagnostics';
 import { findCustomThemeShellUsages, findOnWillApplyThemeUsages, findThemeControlSetDefaultThemeUsages, findWithThemeColorModeUsages, findWithThemeUsages, hasComponentV2Decorator } from './withThemeDiagnostics';
+import * as archDiags from './architecturalDiagnostics';
 
 // ---------------------------------------------------------------------------
 // Diagnostic codes — referenced by codeFixProvider for Quick Fix matching
@@ -25,12 +26,16 @@ export const DIAG_CODES = {
   API_LEVEL: 'arkts-api-level',
   DEPRECATED_ROUTER: 'arkts-deprecated-router',
   SANDBOX_HARDCODED_PATH: 'arkts-sandbox-hardcoded-path',
+  ARCH_PAGE_ISOLATION: 'arkts-arch-page-isolation',
+  ARCH_COMPONENT_PURITY: 'arkts-arch-component-purity',
+  ARCH_ROUTER_IN_COMPONENT: 'arkts-arch-router-in-component',
 } as const;
 
 export type DiagCode = (typeof DIAG_CODES)[keyof typeof DIAG_CODES];
 
 interface AnalyzeContext {
   hasDarkThemeResource?: boolean;
+  filePath?: string;
 }
 
 const SOURCE = 'HarmonyOS';
@@ -52,6 +57,10 @@ const V2_DECORATORS = new Set([
   '@ComponentV2', '@Local', '@Param', '@Once', '@Event', '@Monitor',
   '@Computed', '@Provider', '@Consumer', '@ObservedV2', '@Trace',
 ]);
+const V1_DECORATOR_REGEXES = Array.from(V1_DECORATORS).map(dec => {
+  const escaped = dec.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&');
+  return new RegExp(escaped + '(?!V2|ed|\\w)');
+});
 
 // Complex type indicators after @State
 const COMPLEX_TYPE_PATTERNS = [
@@ -132,7 +141,7 @@ export function createDiagnosticProvider(context: vscode.ExtensionContext): vsco
     const version = (runVersions.get(uriKey) ?? 0) + 1;
     runVersions.set(uriKey, version);
 
-    const analyzeContext: AnalyzeContext = {};
+    const analyzeContext: AnalyzeContext = { filePath: uri.fsPath };
     if (findWithThemeColorModeUsages(text).length > 0) {
       analyzeContext.hasDarkThemeResource = await hasDarkThemeResource(getPreferredWorkspaceFolder(uri));
     }
@@ -228,18 +237,26 @@ export interface RawDiagnostic {
 export function analyzeText(text: string, projectApiLevel?: number, context: AnalyzeContext = {}): RawDiagnostic[] {
   const lines = text.split('\n');
   const diags: RawDiagnostic[] = [];
+  const buildBlocks = extractBuildBlocks(text);
 
   diags.push(...checkStrictTypes(lines));
   diags.push(...checkStateManagement(lines, text));
   diags.push(...checkReusableV2RepeatTemplateUsage(text));
-  diags.push(...checkThemeControlPlacement(text));
+  diags.push(...checkThemeControlPlacement(buildBlocks));
   diags.push(...checkCustomThemeShells(text));
   diags.push(...checkWithThemeDarkResources(text, context));
-  diags.push(...checkPerformanceAntiPatterns(lines, text));
+  diags.push(...checkPerformanceAntiPatterns(lines, text, buildBlocks));
   diags.push(...checkDeprecatedRouter(lines));
   diags.push(...checkSandboxAntiPatterns(lines));
   if (projectApiLevel) {
     diags.push(...checkApiLevelUsage(lines, text, projectApiLevel));
+  }
+  
+  // Harness Engineering: Architectural Boundary Enforcement
+  if (context.filePath) {
+    diags.push(...archDiags.checkPageIsolation(lines, context.filePath));
+    diags.push(...archDiags.checkComponentPurity(lines, text, context.filePath));
+    diags.push(...archDiags.checkRouterInComponent(lines, context.filePath));
   }
 
   return diags;
@@ -353,9 +370,7 @@ function checkStateManagement(lines: string[], text: string): RawDiagnostic[] {
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
     // Collect V1/V2 decorator locations (use regex to avoid substring false positives)
-    for (const dec of V1_DECORATORS) {
-      const escaped = dec.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp(escaped + '(?!V2|ed|\\w)');
+    for (const re of V1_DECORATOR_REGEXES) {
       if (re.test(line)) foundV1.add(i);
     }
     for (const dec of V2_DECORATORS) {
@@ -426,10 +441,10 @@ function checkReusableV2RepeatTemplateUsage(text: string): RawDiagnostic[] {
   }));
 }
 
-function checkThemeControlPlacement(text: string): RawDiagnostic[] {
+function checkThemeControlPlacement(buildBlocks: BuildBlock[]): RawDiagnostic[] {
   const diags: RawDiagnostic[] = [];
 
-  for (const block of extractBuildBlocks(text)) {
+  for (const block of buildBlocks) {
     for (const usage of findThemeControlSetDefaultThemeUsages(block.content)) {
       diags.push({
         line: block.startLine + usage.line,
@@ -475,7 +490,7 @@ function checkWithThemeDarkResources(text: string, context: AnalyzeContext): Raw
 // Rule 3: Performance anti-patterns
 // ---------------------------------------------------------------------------
 
-function checkPerformanceAntiPatterns(lines: string[], text: string): RawDiagnostic[] {
+function checkPerformanceAntiPatterns(lines: string[], text: string, buildBlocks: BuildBlock[]): RawDiagnostic[] {
   const diags: RawDiagnostic[] = [];
 
   // ForEach with large data — suggest LazyForEach
@@ -498,7 +513,6 @@ function checkPerformanceAntiPatterns(lines: string[], text: string): RawDiagnos
   }
 
   // Heavy computation inside build()
-  const buildBlocks = extractBuildBlocks(text);
   for (const block of buildBlocks) {
     for (const { pattern, message } of HEAVY_BUILD_PATTERNS) {
       const match = block.content.match(pattern);

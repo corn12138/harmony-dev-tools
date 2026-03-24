@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-03-24
+
+> Summary: Harness Engineering Refactor (Context Injection, Architecture Guardrails, Entropy Sweeper)
+> 摘要：脚手架工程全面重构（引入动态 AI 上下文、架构屏障与代码熵减/垃圾回收工具）
+
+### Added
+- **Context Engineering**: Added \`harmony.exportAiContext\` to dynamically extract API levels and project dependencies into a \`.cursorrules\` file, mechanically forcing AI agents to adhere to current project reality rather than hallucinating SDKs.
+- **Architectural Constraints (Mechanical Guardrails)**:
+  - Added \`arkts-arch-page-isolation\`: Strict diagnostic error when a \`pages/\` file imports another page directly instead of routing.
+  - Added \`arkts-arch-component-purity\`: Strict diagnostic error preventing \`@Entry\` usage inside reusable \`components/\` files.
+  - Added \`arkts-arch-router-in-component\`: Strict diagnostic error blocking \`@ohos.router\` usage inside pure UI components.
+- **Entropy Management**: Added \`harmony.cleanEntropy\` command to statically analyze and cross-reference all \`$r(...)\` usages against \`string.json\`, identifying and sweeping dead/unused resources left behind by AI development iterations.
+
+### Tested
+- Scaled up the test suite to **828 Unit Tests** and **80 E2E Integration Tests**.
+- Added \`Harness Engineering Features\` test suite blocking regressions on AI rules generation and entropy commands.
+- Verified stability under Extreme Stress: 100 concurrent edits, 50 diagnostic thrashing cycles, and 100 simultaneous snippet bombardments.
+
 ## [0.7.0] - 2026-03-24
 
 > Summary: HarmonyOS 6 ecosystem alignment, Cangjie language support, and comprehensive stress testing.
