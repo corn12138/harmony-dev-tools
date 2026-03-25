@@ -14,7 +14,8 @@ export function run(): Promise<void> {
 
   return new Promise((c, e) => {
     try {
-      const files = globSync('**/*.e2e.test.js', { cwd: testsRoot });
+      const files = globSync('**/*.e2e.test.js', { cwd: testsRoot })
+        .filter((file) => !file.endsWith('.smoke.e2e.test.js'));
 
       files.forEach(f => mocha.addFile(path.resolve(testsRoot, f)));
 

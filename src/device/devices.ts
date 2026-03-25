@@ -21,6 +21,7 @@ interface PickConnectedDeviceOptions {
   filterType?: ConnectedDevice['type'];
   rememberSelection?: boolean;
   forcePick?: boolean;
+  awaitUnavailablePrompt?: boolean;
 }
 
 interface DeviceStatusBarState {
@@ -149,10 +150,19 @@ export async function pickConnectedDevice(
 }
 
 export async function promptAndSelectDevice(): Promise<void> {
-  const device = await ensureConnectedDevice({
+  const state = await getConnectedDeviceState();
+  if (state.devices.length === 0) {
+    await pickFromDeviceState(state, {
+      placeHolder: 'Select the default HarmonyOS device',
+      awaitUnavailablePrompt: false,
+    }, true);
+    return;
+  }
+
+  const device = await pickFromDeviceState(state, {
     placeHolder: 'Select the default HarmonyOS device',
-    forcePick: true,
-  });
+    forcePick: state.devices.length > 1,
+  }, true);
 
   if (device) {
     void vscode.commands.executeCommand(COMMANDS.VIEW_DEVICES);
@@ -250,9 +260,24 @@ async function pickFromDeviceState(
       if (state.error) {
         await explainDeviceConnectionIssue(state.error);
       } else {
-        vscode.window.showWarningMessage(
-          'No HarmonyOS devices connected. Connect a device via USB, Wi-Fi, or start an emulator.',
-        );
+        const showMessage = async (): Promise<void> => {
+          const action = await vscode.window.showWarningMessage(
+            'No HarmonyOS devices connected. Connect a device via USB, Wi-Fi, or start an emulator.',
+            'Connect Wi-Fi Device',
+            'Check Environment',
+          );
+          if (action === 'Connect Wi-Fi Device') {
+            await vscode.commands.executeCommand(COMMANDS.CONNECT_WIFI_DEVICE);
+          } else if (action === 'Check Environment') {
+            await vscode.commands.executeCommand(COMMANDS.CHECK_ENVIRONMENT);
+          }
+        };
+
+        if (options.awaitUnavailablePrompt === false) {
+          void showMessage();
+        } else {
+          await showMessage();
+        }
       }
     }
     return undefined;

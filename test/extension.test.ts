@@ -14,6 +14,12 @@ const getConnectedDeviceState = vi.fn(async () => ({
 }));
 const promptAndSelectDevice = vi.fn(async () => undefined);
 const selectDeviceById = vi.fn(async (_deviceId?: string) => true);
+const ensureConnectedDevice = vi.fn(async () => ({
+  id: 'emulator-5554',
+  name: 'emulator-5554',
+  type: 'emulator',
+  status: 'online' as const,
+}));
 const pickConnectedDevice = vi.fn(async () => ({
   id: 'emulator-5554',
   name: 'emulator-5554',
@@ -48,7 +54,10 @@ const migrateBuildProfile = vi.fn(async (_uri?: any) => undefined);
 const checkApiCompatibility = vi.fn(async () => undefined);
 const openDeviceMirror = vi.fn(async (_deviceId?: string) => undefined);
 const launchEmulator = vi.fn(async () => undefined);
+const launchEmulatorAndRun = vi.fn(async (_emulatorName?: string) => undefined);
 const stopEmulator = vi.fn(async () => undefined);
+const initializeWifiConnectionStorage = vi.fn((_storage?: unknown) => undefined);
+const connectWifiDevice = vi.fn(async (_address?: string) => undefined);
 const checkEnvironment = vi.fn(async () => undefined);
 const takeDeviceScreenshot = vi.fn(async (_deviceId?: unknown) => undefined);
 
@@ -164,6 +173,7 @@ vi.mock('../src/device/devices', () => ({
   getConnectedDeviceState,
   promptAndSelectDevice,
   selectDeviceById,
+  ensureConnectedDevice,
   pickConnectedDevice,
   getActiveDeviceId,
   chooseAutoDevice,
@@ -248,8 +258,17 @@ vi.mock('../src/device/emulatorManager', () => ({
   stopEmulator,
 }));
 
+vi.mock('../src/device/launchEmulatorAndRun', () => ({
+  launchEmulatorAndRun,
+}));
+
 vi.mock('../src/project/checkEnvironment', () => ({
   checkEnvironment,
+}));
+
+vi.mock('../src/device/wifiConnection', () => ({
+  initializeWifiConnectionStorage,
+  connectWifiDevice,
 }));
 
 async function flushImports(): Promise<void> {
@@ -326,6 +345,14 @@ describe('extension smoke', () => {
   it('should route key commands to their feature modules without losing arguments', async () => {
     const vscode = await import('vscode');
     const { activate } = await import('../src/extension');
+    buildAndRun.mockResolvedValue({ ok: true, stage: 'launch', message: 'build ok', deviceId: 'emulator-5554', hapPath: '/tmp/app.hap' });
+    launchEmulatorAndRun.mockResolvedValueOnce({
+      ok: true,
+      stage: 'launch',
+      message: 'emulator run ok',
+      emulatorName: 'Mate 70 Pro',
+      deviceId: '127.0.0.1:5555',
+    });
     const context = createExtensionContext();
     context.extensionUri = vscode.Uri.file('/extension');
     context.globalStorageUri = vscode.Uri.file('/extension/storage');
@@ -335,20 +362,46 @@ describe('extension smoke', () => {
 
     await vscode.commands.executeCommand(COMMANDS.SELECT_DEVICE);
     await vscode.commands.executeCommand(COMMANDS.USE_DEVICE, { id: 'device-C' });
-    await vscode.commands.executeCommand(COMMANDS.BUILD_AND_RUN);
+    const buildResult = await vscode.commands.executeCommand(COMMANDS.BUILD_AND_RUN);
+    const launchResult = await vscode.commands.executeCommand(COMMANDS.LAUNCH_EMULATOR_AND_RUN, { info: { name: 'Mate 70 Pro' } });
     await vscode.commands.executeCommand(COMMANDS.OPEN_CONTROL_CENTER);
     await vscode.commands.executeCommand(COMMANDS.UI_INSPECTOR, 'device-A');
     await vscode.commands.executeCommand(COMMANDS.DEVICE_MIRROR, 'device-B');
     await vscode.commands.executeCommand(COMMANDS.OPEN_WEBVIEW_DEVTOOLS, 'device-W');
     await vscode.commands.executeCommand(COMMANDS.TAKE_SCREENSHOT, { id: 'device-D' });
     await vscode.commands.executeCommand(COMMANDS.CHECK_ENVIRONMENT);
+    await vscode.commands.executeCommand(COMMANDS.CONNECT_WIFI_DEVICE, '192.168.1.88:5555');
     await vscode.commands.executeCommand(COMMANDS.VIEW_DEVICES);
     await vscode.commands.executeCommand(COMMANDS.DEBUG_APP);
 
     expect(promptAndSelectDevice).toHaveBeenCalledTimes(1);
     expect(selectDeviceById).toHaveBeenCalledWith('device-C');
     expect(buildAndRun).toHaveBeenCalledWith({ openInspector: true });
-    expect(buildAndRun).toHaveBeenCalledTimes(2);
+    expect(launchEmulatorAndRun).toHaveBeenCalledWith('Mate 70 Pro');
+    expect(connectWifiDevice).toHaveBeenCalledWith('192.168.1.88:5555');
+    expect(ensureConnectedDevice).toHaveBeenCalledWith({
+      preferredId: 'emulator-5554',
+      placeHolder: 'Select a HarmonyOS device to debug',
+    });
+    expect(buildAndRun).toHaveBeenCalledWith({
+      preferredDeviceId: 'emulator-5554',
+      postLaunchAction: 'none',
+    });
+    expect(buildAndRun).toHaveBeenCalledTimes(3);
+    expect(buildResult).toEqual({
+      ok: true,
+      stage: 'launch',
+      message: 'build ok',
+      deviceId: 'emulator-5554',
+      hapPath: '/tmp/app.hap',
+    });
+    expect(launchResult).toEqual({
+      ok: true,
+      stage: 'launch',
+      message: 'emulator run ok',
+      emulatorName: 'Mate 70 Pro',
+      deviceId: '127.0.0.1:5555',
+    });
     expect(openUIInspector).toHaveBeenCalledWith('device-A');
     expect(openDeviceMirror).toHaveBeenCalledWith('device-B');
     expect(openWebViewDevTools).toHaveBeenCalledWith('device-W');
@@ -362,6 +415,7 @@ describe('extension smoke', () => {
       type: 'harmonyos',
       request: 'launch',
       name: 'Debug HarmonyOS App',
+      deviceId: 'emulator-5554',
     });
   });
 

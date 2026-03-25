@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import { buildHvigorCommand } from '../utils/hvigor';
+import { formatHvigorProjectSetupIssue, resolveHvigorExecution } from '../utils/hvigor';
+import { resolveAssembleHapPreflight } from './preflight';
 
 interface HvigorTaskDefinition extends vscode.TaskDefinition {
   task: string;
@@ -33,12 +34,30 @@ export class HvigorTaskProvider implements vscode.TaskProvider {
 
       for (const taskDef of HVIGOR_TASKS) {
         const definition: HvigorTaskDefinition = { type: HvigorTaskProvider.type, task: taskDef.name };
+        const preflight = taskDef.name.startsWith('assemble')
+          ? await resolveAssembleHapPreflight(folder.uri.fsPath, { task: taskDef.name })
+          : {
+              hvigorExecution: await resolveHvigorExecution(folder.uri.fsPath, { task: taskDef.name }),
+              warnings: [],
+              blockingMessage: undefined,
+            };
+        const hvigorExecution = preflight.hvigorExecution;
+        const isHvigorBroken =
+          !hvigorExecution.projectSetup.exists && !hvigorExecution.executablePath
+          || (hvigorExecution.projectSetup.missingRuntimePaths.length > 0 && hvigorExecution.source !== 'external');
+        if (isHvigorBroken || preflight.blockingMessage) {
+          continue;
+        }
         const task = new vscode.Task(
           definition,
           folder,
           taskDef.label,
           'hvigor',
-          new vscode.ShellExecution(buildHvigorCommand({ task: taskDef.name }), { cwd: folder.uri.fsPath }),
+          new vscode.ShellExecution(hvigorExecution.command, {
+            cwd: folder.uri.fsPath,
+            ...(hvigorExecution.environment ? { env: hvigorExecution.environment } : {}),
+            ...(hvigorExecution.shellPath ? { shellPath: hvigorExecution.shellPath } : {}),
+          }),
           '$hvigor'
         );
         task.group = taskDef.group;
@@ -49,19 +68,53 @@ export class HvigorTaskProvider implements vscode.TaskProvider {
     return tasks;
   }
 
-  resolveTask(task: vscode.Task): vscode.Task | undefined {
+  async resolveTask(task: vscode.Task): Promise<vscode.Task | undefined> {
     const definition = task.definition as HvigorTaskDefinition;
     if (!definition.task) return undefined;
 
     const folder = task.scope as vscode.WorkspaceFolder;
+    const folderPath = folder?.uri.fsPath;
+    if (!folderPath) {
+      return undefined;
+    }
+    const hvigorExecution = await resolveHvigorExecution(folderPath, {
+      task: definition.task,
+      module: definition.module,
+    });
+    const preflight = definition.task.startsWith('assemble')
+      ? await resolveAssembleHapPreflight(folderPath, {
+          task: definition.task,
+        })
+      : {
+          hvigorExecution,
+          warnings: [],
+          blockingMessage: undefined,
+        };
+    const resolvedExecution = preflight.hvigorExecution;
+    if (
+      !resolvedExecution.projectSetup.exists && !resolvedExecution.executablePath
+      || (resolvedExecution.projectSetup.missingRuntimePaths.length > 0 && resolvedExecution.source !== 'external')
+    ) {
+      void vscode.window.showWarningMessage(formatHvigorProjectSetupIssue(folderPath, resolvedExecution.projectSetup));
+      return undefined;
+    }
+    if (preflight.blockingMessage) {
+      void vscode.window.showWarningMessage(preflight.blockingMessage);
+      return undefined;
+    }
+
     return new vscode.Task(
       definition,
       folder ?? vscode.TaskScope.Workspace,
       definition.task,
       'hvigor',
       new vscode.ShellExecution(
-        buildHvigorCommand({ task: definition.task, module: definition.module }),
-        folder ? { cwd: folder.uri.fsPath } : undefined,
+        resolvedExecution.command,
+        {
+          cwd: folder.uri.fsPath,
+          ...(resolvedExecution.environment ? { env: resolvedExecution.environment } : {}),
+          ...(resolvedExecution.shellPath ? { shellPath: resolvedExecution.shellPath } : {}),
+        },
       ),
       '$hvigor'
     );

@@ -1,6 +1,7 @@
 import { execFile, spawn, type ChildProcess, type ExecFileOptionsWithStringEncoding, type SpawnOptions } from 'child_process';
 import { promisify } from 'util';
 import { resolveHdcPath } from './config';
+import { shouldUseBatchShell } from './commandShell';
 
 const execFileAsync = promisify(execFile);
 
@@ -53,7 +54,7 @@ export async function execHdc(
   try {
     return await execFileAsync(hdc, args, {
       encoding: 'utf8',
-      shell: shouldUseShell(hdc),
+      shell: shouldUseBatchShell(hdc),
       ...options,
     });
   } catch (error) {
@@ -68,7 +69,7 @@ export async function spawnHdc(
   const hdc = await resolveHdcPath();
   return await new Promise<ChildProcess>((resolve, reject) => {
     const child = spawn(hdc, args, {
-      shell: shouldUseShell(hdc),
+      shell: shouldUseBatchShell(hdc),
       ...options,
     });
 
@@ -120,10 +121,6 @@ export function buildHdcTerminalCommand(
       return arg.raw ? arg.value : renderArg(arg.value);
     }),
   ].join(' ');
-}
-
-function shouldUseShell(command: string): boolean {
-  return process.platform === 'win32' && /\.(cmd|bat)$/i.test(command);
 }
 
 function quotePosix(value: string): string {

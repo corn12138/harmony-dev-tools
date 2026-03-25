@@ -1,10 +1,11 @@
 import * as vscode from 'vscode';
 import { resolveHdcPath } from '../utils/config';
-import { buildHvigorCommand } from '../utils/hvigor';
+import { formatHvigorProjectSetupIssue, resolveHvigorExecution } from '../utils/hvigor';
 import { readBundleName, readEntryAbility } from '../utils/projectMetadata';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { ensureConnectedDevice, type ConnectedDevice } from '../device/devices';
 import { buildHdcTargetArgs, buildHdcTerminalCommand, rawTerminalArg } from '../utils/hdc';
+import { resolveAssembleHapPreflight } from './preflight';
 
 let buildTerminal: vscode.Terminal | undefined;
 
@@ -20,6 +21,15 @@ export async function terminalBuildAndRun(): Promise<void> {
   }
 
   const rootPath = folder.uri.fsPath;
+  const preflight = await resolveAssembleHapPreflight(rootPath, {
+    powershellCall: process.platform === 'win32',
+  });
+  const hvigorExecution = preflight.hvigorExecution;
+  if (preflight.blockingMessage) {
+    vscode.window.showErrorMessage(preflight.blockingMessage);
+    return;
+  }
+
   const [hdc, bundleName, abilityName, device] = await Promise.all([
     resolveHdcPath(),
     readBundleName(folder.uri),
@@ -44,6 +54,7 @@ export async function terminalBuildAndRun(): Promise<void> {
     name: 'HarmonyOS Run',
     cwd: rootPath,
     iconPath: new vscode.ThemeIcon('rocket'),
+    ...(hvigorExecution.environment ? { env: hvigorExecution.environment } : {}),
     shellPath: process.platform === 'win32' ? 'powershell.exe' : undefined,
   });
 
@@ -51,12 +62,14 @@ export async function terminalBuildAndRun(): Promise<void> {
 
   const commands = process.platform === 'win32'
     ? buildPowerShellBuildAndRunCommand({
+        buildCommand: hvigorExecution.command,
         hdc,
         deviceId: device.id,
         bundleName,
         abilityName: abilityName || 'EntryAbility',
       })
     : buildPosixBuildAndRunCommand({
+        buildCommand: hvigorExecution.command,
         hdc,
         deviceId: device.id,
         bundleName,
@@ -174,6 +187,7 @@ function buildStopCommand(options: {
 }
 
 function buildPosixBuildAndRunCommand(options: {
+  buildCommand: string;
   hdc: string;
   deviceId: string;
   bundleName: string;
@@ -190,7 +204,7 @@ function buildPosixBuildAndRunCommand(options: {
   return [
     'echo "========== HarmonyOS Build & Run =========="',
     'echo "[1/4] Building HAP..."',
-    buildHvigorCommand({ task: 'assembleHap' }),
+    options.buildCommand,
     'echo ""',
     'echo "[2/4] Locating HAP output..."',
     'SIGNED_HAP="$(find . -path "*/build/*/outputs/*/*signed*.hap" -type f | head -1)"',
@@ -209,6 +223,7 @@ function buildPosixBuildAndRunCommand(options: {
 }
 
 function buildPowerShellBuildAndRunCommand(options: {
+  buildCommand: string;
   hdc: string;
   deviceId: string;
   bundleName: string;
@@ -225,7 +240,7 @@ function buildPowerShellBuildAndRunCommand(options: {
     '$ErrorActionPreference = "Stop"',
     'Write-Host "========== HarmonyOS Build & Run =========="',
     'Write-Host "[1/4] Building HAP..."',
-    '& .\\hvigorw.bat assembleHap --no-daemon',
+    options.buildCommand,
     'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
     'Write-Host ""',
     'Write-Host "[2/4] Locating HAP output..."',

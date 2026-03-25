@@ -25,6 +25,15 @@ export const HARMONY_ACTIONS: HarmonyActionDefinition[] = [
     command: COMMANDS.BUILD_AND_RUN,
   },
   {
+    id: 'launch-emulator-and-run',
+    section: 'Run',
+    label: 'Launch Emulator & Run',
+    description: 'Pick an emulator, boot it, and deploy there',
+    tooltip: 'Choose a HarmonyOS emulator, wait for it to be ready in HDC, then build, install, and launch the current app on that emulator.',
+    icon: 'vm-running',
+    command: COMMANDS.LAUNCH_EMULATOR_AND_RUN,
+  },
+  {
     id: 'debug-app',
     section: 'Run',
     label: 'Debug App',
@@ -50,6 +59,15 @@ export const HARMONY_ACTIONS: HarmonyActionDefinition[] = [
     tooltip: 'Choose the default device used by run, mirror, logs, screenshot, and inspector actions.',
     icon: 'device-mobile',
     command: COMMANDS.SELECT_DEVICE,
+  },
+  {
+    id: 'connect-wifi-device',
+    section: 'Device',
+    label: 'Connect Wi-Fi Device',
+    description: 'Run hdc tconn without leaving VS Code',
+    tooltip: 'Connect a HarmonyOS device over Wi-Fi using HDC and set it as the active target.',
+    icon: 'broadcast',
+    command: COMMANDS.CONNECT_WIFI_DEVICE,
   },
   {
     id: 'open-mirror',

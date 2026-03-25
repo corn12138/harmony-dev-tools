@@ -2,6 +2,52 @@
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-03-25
+
+> Summary: one-click emulator run hardening, real-smoke fixture alignment, and machine-environment diagnostics.
+> 摘要：一键模拟器运行链路加固、真实 smoke 工程对齐，以及本机环境诊断前置。
+
+### Fixed
+- Switched the real HarmonyOS smoke fixture to a phone-targeted HarmonyOS runtime shape, including current-style HarmonyOS 6 SDK version strings in `build-profile.json5`, so smoke probing matches real DevEco phone emulator projects.
+- Hardened real-smoke SDK discovery to expand actual SDK homes (`default/hms`, `default/openharmony`, versioned SDK folders), prefer runtime-compatible candidates, and reject SDK roots that do not provide the fixture’s required device types before build execution.
+- Fixed `harmony.selectDevice` so a single online target is auto-selected instead of hanging on an unnecessary picker; multi-device flows still prompt explicitly.
+- Added `Connect Wi-Fi Device` target memory, so the most recent successful `ip:port` is prefilled on the next connection attempt.
+- Added `harmony.wifiDefaultPort`, allowing teams to change the default Wi-Fi `hdc tconn` port instead of relying on a hardcoded `5555`.
+- Fixed HDC auto-discovery so DevEco Studio installs under `sdk/default/openharmony/toolchains/hdc` are found even when the SDK root is not version-numbered.
+- Expanded Mac/Windows local-tool resolution to also cover HarmonyOS/OpenHarmony SDK environment variables (`DEVECO_SDK_HOME`, `OHOS_BASE_SDK_HOME`, `HarmonyOS_HOME`, `OpenHarmony_HOME`), command-line-tools overrides, historical emulator deployed roots, and `HarmonyOS_HVD_HOME` custom emulator locations.
+- Added configuration-first search roots for SDK, command-line-tools, emulator, and DevEco Studio installs (`harmony.sdkSearchPaths`, `harmony.commandLineToolsSearchPaths`, `harmony.emulatorSearchPaths`, `harmony.devEcoStudioSearchPaths`) so explicit local directories beat PATH/default guesses.
+- Added clearer `Check SDK / HDC Environment` recovery hints so when auto-detection still misses, developers are told exactly which DevEco Studio menu to open, what path layout they should see, and which `harmony.*Path` setting to fill manually.
+- Sanitized hvigor execution environments across background builds, task provider, terminal build, environment probe, and real-smoke setup so project-resolved SDK paths override stale `DEVECO_SDK_HOME` / `OHOS_BASE_SDK_HOME` values from the host machine.
+- Added explicit diagnostics for missing HarmonyOS SDK components (`SDK component missing`), both in `Check SDK / HDC Environment` and in the real smoke preflight, with concrete manual recovery steps instead of generic hvigor failures.
+- Refined real-smoke SDK repair messaging so existing `default/hms` / `default/openharmony` variants are reported as repairable DevEco SDK packages instead of a stale blanket `hmscore missing` hint.
+
+### Docs
+- Refreshed `README.md` for the current 0.8.x workflow: `Launch Emulator & Run`, `Connect Wi-Fi Device`, configuration-first local search roots, Wi-Fi default port, and real smoke prerequisites / fail-fast behavior.
+
+### Tested
+- Full unit suite passes with **942 tests** across **60** test files.
+- Full extension-host E2E suite passes with **85** tests.
+- Real smoke E2E now fails fast with a concrete machine-level remediation path when the local HarmonyOS phone SDK components are incomplete, instead of hanging inside emulator/build orchestration.
+
+## [0.8.2] - 2026-03-24
+
+> Summary: local-tool resolution hardening for real user environments.
+> 摘要：面向真实用户环境的本机工具解析、回退与预检加固。
+
+### Fixed
+- Added machine-level hvigor resolution with a new `harmony.hvigorPath` setting and DevEco Studio fallback probing on macOS and Windows, so builds no longer depend exclusively on a healthy project-local `./hvigorw`.
+- Hardened hvigor preflight checks to detect broken local wrapper scripts (`hvigorw` present but referenced runtime files missing) before build execution, and surfaced clearer diagnostics in `Check SDK / HDC Environment`.
+- Routed `Build HAP`, `Clean`, background build, terminal build, and hvigor task-provider flows through the same hvigor resolution path, including Windows `cmd.exe` pinning for external `.bat` fallback execution.
+- Added a machine-level emulator resolver with a new `harmony.emulatorPath` setting, cross-platform DevEco install probing, and emulator startup shell handling for Windows batch wrappers.
+- Added a machine-level WebView DevTools browser resolver with a new `harmony.devToolsBrowserPath` setting, explicit Chrome/Edge probing on macOS and Windows, and inspect-page launches that respect Windows batch-shell behavior.
+- Expanded signing preflight from `profile.p7b` only to all machine-local signing materials declared in `build-profile.json5` (`profile`, `storeFile`, `certpath`), so missing or unreadable signing files are blocked before `assembleHap`.
+- Extended `Check SDK / HDC Environment` to explain browser fallback, emulator availability, broken hvigor wrappers, and signing-material portability issues in the same user-visible report.
+- Unified local-tool cache invalidation across `sdkPath`, `hdcPath`, `hvigorPath`, and `emulatorPath`, so config changes no longer leave the extension pinned to stale machine paths.
+
+### Tested
+- Added regression and stress coverage for hvigor fallback resolution, local-tool cache invalidation, Mac/Windows path candidate generation, emulator environment reporting, browser resolution, signing-material preflight, shell selection, task-provider generation, runner/terminal command dispatch, and extension-host E2E resolver scenarios.
+- Test suite now passes with **867 Unit Tests** across **51** test files, plus **85** extension-host E2E tests.
+
 ## [0.8.0] - 2026-03-24
 
 > Summary: Harness Engineering Refactor (Context Injection, Architecture Guardrails, Entropy Sweeper)

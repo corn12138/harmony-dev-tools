@@ -1,3 +1,4 @@
+import * as net from 'node:net';
 import * as path from 'node:path';
 import * as vscode from 'vscode';
 import { extractDeviceIdFromCommandArg } from '../device/commandArgs';
@@ -8,10 +9,10 @@ import { parseRequestPermissionEntries } from '../project/projectConfigDiagnosti
 import { formatDebugTarget, listHostNetworkAddresses, parseDeviceNetworkAddresses, pickPreferredDeviceAddress } from './network';
 import { extractWebViewUrlHints, hasWebViewUsage, parseWebDebuggingAccess, type WebDebuggingAccessConfig } from './projectAnalysis';
 import { buildDevToolsFrontendUrl, extractInspectablePageTargets, fetchDevToolsTargets, pickSuggestedInspectableTarget, type DevToolsTarget } from './targets';
+import { openUrlInDevToolsBrowser, resolveDevToolsBrowser, type DevToolsBrowserResolution } from './browser';
 
 const WEBVIEW_DEVTOOLS_DOC_URL = 'https://gitee.com/openharmony/docs/blob/master/zh-cn/application-dev/web/web-debugging-with-devtools.md';
-const CHROME_INSPECT_URL = 'chrome://inspect/#devices';
-const DEFAULT_WEBVIEW_DEVTOOLS_PORT = 9222;
+const PREFERRED_WEBVIEW_DEVTOOLS_PORT = 9222;
 
 interface HdcFportMapping {
   local: string;
@@ -30,6 +31,7 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
   const preferredDeviceId = extractDeviceIdFromCommandArg(commandArg);
   const folder = getPreferredWorkspaceFolder();
   const projectState = folder ? await inspectWebViewDebugProject(folder.uri) : undefined;
+  const browser = await resolveDevToolsBrowser();
 
   const device = await ensureConnectedDevice({
     preferredId: preferredDeviceId,
@@ -45,6 +47,7 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
       projectState.debugAccess.port,
       projectState.moduleJsonUri,
       projectState.preferredUrls,
+      browser,
     );
     return;
   }
@@ -67,13 +70,13 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
         return;
       }
 
-      progress.report({ message: 'Forwarding WebView DevTools to localhost:9222...' });
+      progress.report({ message: 'Forwarding WebView DevTools to localhost...' });
       const port = await ensureWebViewDevToolsForward(device.id, socket);
       const endpoint = `http://127.0.0.1:${port}`;
       const targets = await fetchDevToolsTargets(endpoint).catch(() => []);
 
-      progress.report({ message: 'Opening Chrome inspect...' });
-      await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
+      progress.report({ message: `Opening ${browser.displayName} inspect...` });
+      await openUrlInDevToolsBrowser(browser.inspectUrl, browser);
 
       const actions = buildWebViewActions(
         projectState?.moduleJsonUri,
@@ -81,14 +84,15 @@ export async function openWebViewDevTools(commandArg?: unknown): Promise<void> {
         targets,
         undefined,
         projectState?.preferredUrls ?? [],
+        browser,
       );
 
       const action = await vscode.window.showInformationMessage(
-        buildWebViewReadyMessage(`localhost:${port}`, targets, false, projectState?.preferredUrls ?? []),
+        buildWebViewReadyMessage(`localhost:${port}`, targets, browser, false, projectState?.preferredUrls ?? []),
         ...actions,
       );
 
-      await handleWebViewAction(action, endpoint, targets, projectState?.moduleJsonUri, undefined, projectState?.preferredUrls ?? []);
+      await handleWebViewAction(action, endpoint, targets, projectState?.moduleJsonUri, undefined, projectState?.preferredUrls ?? [], browser);
     },
   );
 }
@@ -219,29 +223,54 @@ async function ensureWebViewDevToolsForward(deviceId: string, socket: string): P
   const targetArgs = buildHdcTargetArgs(deviceId);
   const { stdout } = await execHdc([...targetArgs, 'fport', 'ls'], { timeout: 5000 });
   const mappings = parseHdcFportMappings(stdout);
-  const desiredLocal = `tcp:${DEFAULT_WEBVIEW_DEVTOOLS_PORT}`;
   const desiredRemote = `localabstract:${socket}`;
-
-  const existing = mappings.find((item) => item.local === desiredLocal && item.remote === desiredRemote);
-  if (existing) {
-    return DEFAULT_WEBVIEW_DEVTOOLS_PORT;
+  const existingRemote = mappings.find((item) => item.remote === desiredRemote && /^tcp:\d+$/.test(item.local));
+  if (existingRemote) {
+    return Number.parseInt(existingRemote.local.slice('tcp:'.length), 10);
   }
 
-  const conflict = mappings.find((item) => item.local === desiredLocal && item.remote !== desiredRemote);
-  if (conflict) {
-    await execHdc([...targetArgs, 'fport', 'rm', conflict.local, conflict.remote], { timeout: 5000 }).catch(() => undefined);
+  const preferredLocal = `tcp:${PREFERRED_WEBVIEW_DEVTOOLS_PORT}`;
+  const preferredConflict = mappings.find((item) => item.local === preferredLocal && item.remote !== desiredRemote);
+  if (preferredConflict) {
+    await execHdc([...targetArgs, 'fport', 'rm', preferredConflict.local, preferredConflict.remote], { timeout: 5000 }).catch(() => undefined);
   }
 
   try {
-    await execHdc([...targetArgs, 'fport', desiredLocal, desiredRemote], { timeout: 5000 });
-    return DEFAULT_WEBVIEW_DEVTOOLS_PORT;
+    await execHdc([...targetArgs, 'fport', preferredLocal, desiredRemote], { timeout: 5000 });
+    return PREFERRED_WEBVIEW_DEVTOOLS_PORT;
   } catch {
-    const fallback = mappings.find((item) => item.remote === desiredRemote && /^tcp:\d+$/.test(item.local));
-    if (fallback) {
-      return Number.parseInt(fallback.local.slice('tcp:'.length), 10);
+    const fallbackPort = await findAvailableDevToolsPort();
+    const fallbackLocal = `tcp:${fallbackPort}`;
+    try {
+      await execHdc([...targetArgs, 'fport', fallbackLocal, desiredRemote], { timeout: 5000 });
+      return fallbackPort;
+    } catch {
+      const fallback = mappings.find((item) => item.remote === desiredRemote && /^tcp:\d+$/.test(item.local));
+      if (fallback) {
+        return Number.parseInt(fallback.local.slice('tcp:'.length), 10);
+      }
+      throw new Error(`Failed to forward WebView DevTools socket ${socket}.`);
     }
-    throw new Error(`Failed to forward WebView DevTools socket ${socket}.`);
   }
+}
+
+async function findAvailableDevToolsPort(): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const server = net.createServer();
+    const closeAndResolve = (port: number) => {
+      server.close(() => resolve(port));
+    };
+
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      if (!address || typeof address === 'string') {
+        server.close(() => reject(new Error('Unable to resolve an available localhost port for WebView DevTools.')));
+        return;
+      }
+      closeAndResolve(address.port);
+    });
+  });
 }
 
 async function pickWebViewSocket(sockets: string[]): Promise<string | undefined> {
@@ -300,23 +329,25 @@ async function handleWirelessWebViewDebugging(
   port: number,
   moduleJsonUri?: vscode.Uri,
   preferredUrls: string[] = [],
+  browser?: DevToolsBrowserResolution,
 ): Promise<void> {
   const selectedAddress = await selectWirelessDebugAddress(deviceId);
   const target = selectedAddress ? formatDebugTarget(selectedAddress.address, port) : formatDebugTarget('<device-ip>', port);
   const endpoint = selectedAddress ? buildHttpEndpoint(selectedAddress.address, port) : undefined;
   const targets = endpoint ? await fetchDevToolsTargets(endpoint).catch(() => []) : [];
-  const actions = buildWebViewActions(moduleJsonUri, true, targets, target, preferredUrls);
+  const resolvedBrowser = browser ?? await resolveDevToolsBrowser();
+  const actions = buildWebViewActions(moduleJsonUri, true, targets, target, preferredUrls, resolvedBrowser);
 
-  await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
+  await openUrlInDevToolsBrowser(resolvedBrowser.inspectUrl, resolvedBrowser);
 
   const action = await vscode.window.showInformationMessage(
     selectedAddress
-      ? buildWebViewReadyMessage(target, targets, true, preferredUrls)
-      : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open Chrome inspect, enable “Discover network targets”, and add ${target}.`,
+      ? buildWebViewReadyMessage(target, targets, resolvedBrowser, true, preferredUrls)
+      : `This project appears to use API 20+ wireless WebView debugging on port ${port}. Open ${resolvedBrowser.displayName} inspect, enable “Discover network targets”, and add ${target}.`,
     ...actions,
   );
 
-  await handleWebViewAction(action, endpoint, targets, moduleJsonUri, target, preferredUrls);
+  await handleWebViewAction(action, endpoint, targets, moduleJsonUri, target, preferredUrls, resolvedBrowser);
 }
 
 async function selectWirelessDebugAddress(deviceId: string): Promise<{ address: string } | undefined> {
@@ -357,6 +388,7 @@ function buildHttpEndpoint(host: string, port: number): string {
 function buildWebViewReadyMessage(
   targetLabel: string,
   targets: DevToolsTarget[],
+  browser: DevToolsBrowserResolution,
   isWireless = false,
   preferredUrls: string[] = [],
 ): string {
@@ -366,22 +398,22 @@ function buildWebViewReadyMessage(
   if (suggested) {
     const pageLabel = suggested.title || suggested.url || 'untitled page';
     if (isWireless) {
-      return `Detected API 20+ wireless WebView debugging on ${targetLabel}. Chrome inspect has been opened, and the current page appears to be ${pageLabel}.`;
+      return `Detected API 20+ wireless WebView debugging on ${targetLabel}. ${browser.displayName} inspect has been opened, and the current page appears to be ${pageLabel}.`;
     }
-    return `WebView DevTools is ready on ${targetLabel}. Chrome inspect can now discover the running ArkWeb page ${pageLabel}.`;
+    return `WebView DevTools is ready on ${targetLabel}. ${browser.displayName} inspect can now discover the running ArkWeb page ${pageLabel}.`;
   }
 
   if (pages.length > 1) {
     if (isWireless) {
-      return `Detected API 20+ wireless WebView debugging on ${targetLabel}. Chrome inspect has been opened, and ${pages.length} inspectable WebView pages were found.`;
+      return `Detected API 20+ wireless WebView debugging on ${targetLabel}. ${browser.displayName} inspect has been opened, and ${pages.length} inspectable WebView pages were found.`;
     }
-    return `WebView DevTools is ready on ${targetLabel}. Chrome inspect can now discover ${pages.length} running ArkWeb pages.`;
+    return `WebView DevTools is ready on ${targetLabel}. ${browser.displayName} inspect can now discover ${pages.length} running ArkWeb pages.`;
   }
 
   if (isWireless) {
-    return `Detected API 20+ wireless WebView debugging on ${targetLabel}. Chrome inspect has been opened; if needed, add ${targetLabel} under “Discover network targets”.`;
+    return `Detected API 20+ wireless WebView debugging on ${targetLabel}. ${browser.displayName} inspect has been opened; if needed, add ${targetLabel} under “Discover network targets”.`;
   }
-  return `WebView DevTools is ready on ${targetLabel}. Chrome inspect can now discover the running ArkWeb page.`;
+  return `WebView DevTools is ready on ${targetLabel}. ${browser.displayName} inspect can now discover the running ArkWeb page.`;
 }
 
 function buildWebViewActions(
@@ -390,8 +422,10 @@ function buildWebViewActions(
   targets: DevToolsTarget[],
   copyTarget?: string,
   preferredUrls: string[] = [],
+  browser?: DevToolsBrowserResolution,
 ): string[] {
-  const actions = ['Open Chrome Inspect', 'Open WebView Docs'];
+  const inspectLabel = `Open ${browser?.displayName ?? 'DevTools'} Inspect`;
+  const actions = [inspectLabel, 'Open WebView Docs'];
   if (copyTarget) {
     actions.unshift(`Copy ${copyTarget}`);
   }
@@ -417,6 +451,7 @@ async function handleWebViewAction(
   moduleJsonUri?: vscode.Uri,
   copyTarget?: string,
   preferredUrls: string[] = [],
+  browser?: DevToolsBrowserResolution,
 ): Promise<void> {
   if (!action) {
     return;
@@ -427,8 +462,9 @@ async function handleWebViewAction(
     return;
   }
 
-  if (action === 'Open Chrome Inspect') {
-    await vscode.env.openExternal(vscode.Uri.parse(CHROME_INSPECT_URL));
+  const resolvedBrowser = browser ?? await resolveDevToolsBrowser();
+  if (action === `Open ${resolvedBrowser.displayName} Inspect`) {
+    await openUrlInDevToolsBrowser(resolvedBrowser.inspectUrl, resolvedBrowser);
     return;
   }
 
@@ -448,13 +484,13 @@ async function handleWebViewAction(
 
   if (action === 'Open Detected Page') {
     const target = pickSuggestedInspectableTarget(targets, preferredUrls);
-    await openDevToolsTarget(endpoint, target);
+    await openDevToolsTarget(endpoint, target, resolvedBrowser);
     return;
   }
 
   if (action === 'Choose Detected Page') {
     const target = await pickDevToolsTarget(targets);
-    await openDevToolsTarget(endpoint, target);
+    await openDevToolsTarget(endpoint, target, resolvedBrowser);
   }
 }
 
@@ -485,7 +521,11 @@ async function pickDevToolsTarget(targets: DevToolsTarget[]): Promise<DevToolsTa
   return pick?.target;
 }
 
-async function openDevToolsTarget(endpoint: string, target: DevToolsTarget | undefined): Promise<void> {
+async function openDevToolsTarget(
+  endpoint: string,
+  target: DevToolsTarget | undefined,
+  browser: DevToolsBrowserResolution,
+): Promise<void> {
   if (!target) {
     return;
   }
@@ -495,7 +535,7 @@ async function openDevToolsTarget(endpoint: string, target: DevToolsTarget | und
     return;
   }
 
-  await vscode.env.openExternal(vscode.Uri.parse(frontendUrl));
+  await openUrlInDevToolsBrowser(frontendUrl, browser);
 }
 
 async function safeReadText(uri: vscode.Uri): Promise<string | undefined> {

@@ -1,0 +1,51 @@
+{
+  "app": {
+    "signingConfigs": [
+      {
+        "name": "e2e",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "__HARMONY_E2E_CERT__",
+          "keyAlias": "__HARMONY_E2E_KEY_ALIAS__",
+          "keyPassword": "__HARMONY_E2E_KEY_PASSWORD__",
+          "profile": "__HARMONY_E2E_PROFILE__",
+          "signAlg": "__HARMONY_E2E_SIGN_ALG__",
+          "storeFile": "__HARMONY_E2E_STORE__",
+          "storePassword": "__HARMONY_E2E_STORE_PASSWORD__"
+        }
+      }
+    ],
+    "products": [
+      {
+        "name": "default",
+        "signingConfig": "e2e",
+        "compileSdkVersion": "6.0.0(20)",
+        "compatibleSdkVersion": "6.0.0(20)",
+        "targetSdkVersion": "6.0.0(20)",
+        "runtimeOS": "HarmonyOS"
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    }
+  ]
+}

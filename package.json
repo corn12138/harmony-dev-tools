@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Build, run, debug, inspect, and validate HarmonyOS apps directly in VS Code",
-  "version": "0.8.0",
+  "version": "0.8.3",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -249,6 +249,12 @@
         "icon": "$(rocket)"
       },
       {
+        "command": "harmony.launchEmulatorAndRun",
+        "title": "Launch Emulator & Run",
+        "category": "HarmonyOS",
+        "icon": "$(vm-running)"
+      },
+      {
         "command": "harmony.terminalBuildAndRun",
         "title": "Build, Install & Run in Terminal",
         "category": "HarmonyOS",
@@ -265,6 +271,12 @@
         "title": "Debug App on Device",
         "category": "HarmonyOS",
         "icon": "$(debug-alt)"
+      },
+      {
+        "command": "harmony.connectWifiDevice",
+        "title": "Connect Wi-Fi Device",
+        "category": "HarmonyOS",
+        "icon": "$(broadcast)"
       },
       {
         "command": "harmony.migrateV1ToV2",
@@ -389,6 +401,11 @@
           "group": "navigation"
         },
         {
+          "command": "harmony.launchEmulatorAndRun",
+          "when": "harmony.isHarmonyProject",
+          "group": "navigation"
+        },
+        {
           "command": "harmony.openDeviceMirror",
           "when": "harmony.isHarmonyProject",
           "group": "navigation"
@@ -443,6 +460,11 @@
           "group": "inline"
         },
         {
+          "command": "harmony.launchEmulatorAndRun",
+          "when": "view == harmony.deviceView && (viewItem == emulator-stopped || viewItem == emulator-running)",
+          "group": "navigation"
+        },
+        {
           "command": "harmony.stopEmulator",
           "when": "view == harmony.deviceView && viewItem == emulator-running",
           "group": "inline"
@@ -457,10 +479,72 @@
           "default": "",
           "description": "Path to HarmonyOS/OpenHarmony SDK root directory"
         },
+        "harmony.sdkSearchPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional local directories to search for HarmonyOS/OpenHarmony SDK roots before falling back to auto-detection."
+        },
         "harmony.hdcPath": {
           "type": "string",
           "default": "",
           "description": "Custom path to the HDC executable. Leave empty to auto-detect."
+        },
+        "harmony.commandLineToolsSearchPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional local directories to search for HarmonyOS command-line-tools before falling back to the default install locations."
+        },
+        "harmony.hvigorPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to the hvigor executable. Leave empty to prefer project ./hvigorw and auto-detect DevEco Studio hvigor as fallback."
+        },
+        "harmony.emulatorPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to the DevEco emulator executable. Leave empty to auto-detect common DevEco Studio install locations."
+        },
+        "harmony.emulatorSearchPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional local directories to search for emulator instances or deployed roots before falling back to the default HarmonyOS emulator locations."
+        },
+        "harmony.devEcoStudioSearchPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional DevEco Studio installation roots to search when auto-detecting SDK, hvigor, command-line-tools, and emulator binaries."
+        },
+        "harmony.devToolsBrowserPath": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to the Chrome or Edge executable used for WebView DevTools. Leave empty to auto-detect a local Chrome/Edge install and otherwise fall back to the system browser."
+        },
+        "harmony.wifiDefaultPort": {
+          "type": "number",
+          "default": 5555,
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Default port appended by Connect Wi-Fi Device when you enter an IP/hostname without an explicit port."
+        },
+        "harmony.signingSearchPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Additional local directories to scan for HarmonyOS signing materials (.p7b/.p12/.cer). The default ~/.ohos/config and ~/.ohos/config/openharmony locations are always included."
         },
         "harmony.autoFormatOnSave": {
           "type": "boolean",
@@ -611,6 +695,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "tsc -p tsconfig.e2e.json && node ./dist/test/e2e/runTest.js",
+    "test:e2e:host": "tsc -p tsconfig.e2e.json && node ./dist/test/e2e/runHostTest.js",
+    "test:e2e:all": "pnpm test:e2e:host && pnpm test:e2e",
     "package": "vsce package --no-dependencies",
     "publish": "vsce publish --no-dependencies",
     "size-check": "node scripts/size-check.js"

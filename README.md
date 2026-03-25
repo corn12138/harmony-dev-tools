@@ -6,31 +6,30 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
 > Core goal / 核心目标：hide HDC, hvigor, config migration, and device-targeting complexity behind a simpler VS Code workflow.
 > 把 HDC、hvigor、配置迁移、多设备选择这些复杂度收进插件里，让用户尽量只关心“选设备、点运行、看结果”。
 
-## What's New in v0.7.0 / v0.7.0 新变化
+## What's New in v0.8.3 / v0.8.3 新变化
 
-`v0.7.0` aligns the extension with HarmonyOS 6 (API 20/22), adds Cangjie language support, and introduces comprehensive stress testing.
-`v0.7.0` 对齐 HarmonyOS 6 (API 20/22) 生态、新增仓颉语言支持、极限压测全覆盖。
+`v0.8.3` focuses on real-machine workflow hardening: one-click emulator run, machine-level tool resolution, Wi-Fi device convenience, and clearer smoke / SDK diagnostics.
+`v0.8.3` 重点收敛真实开发机链路：一键启动模拟器并运行、本机工具解析、Wi‑Fi 真机便捷连接，以及更清晰的 smoke / SDK 诊断。
 
-- **Cangjie (仓颉) language support / 仓颉语言支持**
-  - TextMate syntax highlighting for `.cj` files — 60+ keywords, built-in types, annotations, string interpolation, nested block comments
-  - 17 code snippets: `main`, `func`, `class`, `struct`, `enum`, `interface`, `match`, `let`, `var`, `spawn`, `for`, `while`, `trycatch`, `import`, `println`, `extend`, `prop`
-  - `.cj` 文件语法高亮（60+ 关键字、内置类型、注解、字符串插值、嵌套注释）+ 17 代码片段
-- **HarmonyOS 6 metadata / HarmonyOS 6 元数据**
-  - 9 new components (Repeat, FoldSplitContainer, MediaCachedImage, etc.) + `@Track` decorator
-  - 新增 9 个组件（Repeat、FoldSplitContainer、MediaCachedImage 等）+ `@Track` 装饰器
-- **Page-level scaffolding snippets / 页面级骨架片段**
-  - `listpage`, `detailpage`, `loginpage`, `emptystate`, `fileio`, `navdest`, and more
-  - 列表页、详情页、登录页、空状态、文件 I/O 等一整页骨架片段
-- **New diagnostic rules / 新诊断规则**
-  - `@ohos.router` deprecation detection → suggests Navigation + NavPathStack migration
-  - Hardcoded sandbox path detection (`/data/storage/`, `/storage/`) → suggests `getContext().filesDir`
-  - Quick Fix: one-click open official HarmonyOS documentation
-  - `@ohos.router` 废弃检测 → 建议迁移到 Navigation + NavPathStack
-  - 硬编码沙盒路径检测 → 建议使用 `getContext().filesDir`
-- **Test coverage / 测试覆盖** — 172 new stress tests (649 → 821 total, +26.5%)
-  补充了 172 条极限压测（649 → 821，+26.5%）
+- **One-click emulator run / 一键模拟器运行**
+  - New `Launch Emulator & Run` command: pick an emulator, wait until HDC + shell are ready, then build / install / launch the app and open UI Inspector
+  - 新增 `Launch Emulator & Run`：选择模拟器后自动等待就绪，再构建 / 安装 / 启动并打开 UI Inspector
+- **Machine-level resolver / 本机环境解析器**
+  - Uses `config path > configured search roots > PATH > well-known locations`
+  - Supports Mac / Windows DevEco Studio layouts, command-line-tools layouts, SDK variants, and broken project-local `hvigorw` fallback
+  - 统一采用 `显式路径 > 显式搜索目录 > PATH > 默认安装位` 的查找顺序，并兼容 Mac / Windows 的 DevEco、命令行工具、SDK 变体和损坏的项目本地 `hvigorw`
+- **Wi-Fi device ergonomics / Wi‑Fi 真机体验**
+  - New `Connect Wi‑Fi Device` command
+  - Remembers the most recent successful `ip:port`
+  - Configurable default Wi-Fi port via `harmony.wifiDefaultPort`
+  - 新增 `Connect Wi‑Fi Device`，记住最近一次成功地址，并支持 `harmony.wifiDefaultPort` 配置默认端口
+- **Preflight and environment diagnostics / 预检与环境诊断**
+  - `Check SDK / HDC Environment` now explains where the extension looked, why a tool was rejected, and which setting to fill manually if needed
+  - Real smoke E2E now fails fast with actionable SDK repair guidance instead of hanging deep inside the build/run chain
+  - `Check SDK / HDC Environment` 会明确说明“查了哪里 / 为什么不可用 / 手动该填哪个设置”
+  - real smoke 也会在前置阶段快速失败并给出 SDK 修复步骤，而不是深层卡死
 
-## How to Use v0.7.0 / v0.7.0 怎么用
+## How to Use v0.8.3 / v0.8.3 怎么用
 
 ### Fastest workflow / 最快上手方式
 
@@ -52,10 +51,12 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
    如果你要做主题换肤页面，直接输入 `withtheme` 或 `themecontrol`，或者在补全/文档搜索里找 `WithTheme` / `ThemeControl`。
 9. If you switch local color mode, make sure the project has either `dark.json` or `resources/dark/...` resources.
    如果你要切局部深浅色，记得工程里要有 `dark.json` 或 `resources/dark/...` 深色资源。
-10. Click `Build, Install & Run`.
-   然后点 `Build, Install & Run`。
-11. For device-specific work, right-click the device node in `Connected Devices`.
-   如果要看日志、镜像、截图、UI Inspector，就在 `Connected Devices` 里右键对应设备。
+10. If no device is online, click `Launch Emulator & Run` or `Connect Wi‑Fi Device`.
+    如果当前没有在线设备，直接点 `Launch Emulator & Run` 或 `Connect Wi‑Fi Device`。
+11. Otherwise click `Build, Install & Run`.
+    否则直接点 `Build, Install & Run`。
+12. For device-specific work, right-click the device node in `Connected Devices`.
+    如果要看日志、镜像、截图、UI Inspector，就在 `Connected Devices` 里右键对应设备。
 
 ## Start Here / 先从这里开始
 
@@ -65,9 +66,11 @@ Build, run, debug, inspect, and validate HarmonyOS / OpenHarmony apps directly i
    先运行 `HarmonyOS: Check SDK / HDC Environment`，确认 SDK、HDC 和工程前置条件都正常。
 2. Open a HarmonyOS project that contains `build-profile.json5`.
    打开包含 `build-profile.json5` 的鸿蒙工程。
-3. Connect a device or start an emulator, then click the active-device status bar item or run `HarmonyOS: Select Active Device`.
-   连接真机或启动模拟器，然后点击状态栏当前设备，或执行 `HarmonyOS: Select Active Device`。
-4. Use `Quick Actions` to run `Build, Install & Run`.
+3. If you already have a USB / Wi‑Fi target online, click the active-device status bar item or run `HarmonyOS: Select Active Device`.
+   如果已经有 USB / Wi‑Fi 设备在线，点击状态栏当前设备，或执行 `HarmonyOS: Select Active Device`。
+4. If nothing is online yet, run `HarmonyOS: Launch Emulator & Run` or `HarmonyOS: Connect Wi‑Fi Device`.
+   如果当前没有在线目标，执行 `HarmonyOS: Launch Emulator & Run` 或 `HarmonyOS: Connect Wi‑Fi Device`。
+5. Use `Quick Actions` to run `Build, Install & Run`.
    在 `Quick Actions` 里直接点 `Build, Install & Run`。
 
 ### Best Entry Points / 最常用入口
@@ -262,6 +265,7 @@ Run `HarmonyOS: Open Device Logs (hilog)` to stream `hdc hilog` output to VS Cod
 - **Auto-detect emulators / 自动检测模拟器** — scans DevEco Studio emulator directories (macOS/Windows/Linux) / 扫描 DevEco Studio 模拟器目录
 - **TreeView integration / 树视图集成** — Devices & Emulators sections in sidebar / 侧边栏设备和模拟器分组显示
 - **Launch / Stop / 启动/停止** — start emulators from VS Code, auto-opens Device Mirror when online / 从 VS Code 启动模拟器，上线后自动打开设备镜像
+- **Launch Emulator & Run / 启动模拟器并运行** — choose one emulator, wait for HDC + shell ready, then build / install / launch to that exact target / 选择一个模拟器，等待 HDC + shell ready，再把当前项目构建 / 安装 / 启动到这个明确目标
 - **Status monitoring / 状态监控** — running/stopped status with live icons / 运行/停止状态实时图标
 
 ### Component Preview / 组件预览 (Enhanced v0.3.0+)
@@ -299,15 +303,44 @@ Run `HarmonyOS: Preview ArkUI Component` on any `.ets` file to see a live previe
 
 - **HDC** (HarmonyOS Device Connector) in PATH, or configure `harmony.hdcPath` in settings / HDC 在 PATH 中，或在设置中配置 `harmony.hdcPath`
 - **HarmonyOS Command Line Tools** recommended (`sdkmgr`, `ohpm`, `codelinter`) / 推荐安装鸿蒙命令行工具
-- **hvigorw** — the project must contain `hvigorw` script in the root directory / 项目根目录需包含 `hvigorw` 脚本（标准鸿蒙项目）
+- **hvigorw** — the project should contain `hvigorw` in the root directory; if the local wrapper is broken, configure `harmony.hvigorPath` or let the extension fall back to DevEco Studio's bundled hvigor / 工程根目录建议包含 `hvigorw`；如果本地 wrapper 损坏，可配置 `harmony.hvigorPath`，或让扩展回退到 DevEco Studio 自带 hvigor
+- **DevEco emulator** optional — if auto-detection misses your local install, configure `harmony.emulatorPath` / DevEco 模拟器为可选项；如果自动探测不到本机安装位置，可配置 `harmony.emulatorPath`
+- **Chrome / Edge for WebView DevTools** optional — if auto-detection misses your local browser install, configure `harmony.devToolsBrowserPath` / WebView DevTools 建议本机有 Chrome 或 Edge；如果自动探测不到，可配置 `harmony.devToolsBrowserPath`
 - A connected HarmonyOS device or emulator for build/run/debug features / 已连接的鸿蒙设备或模拟器（构建/运行/调试功能需要）
+
+### Machine Environment Resolution / 本机环境解析策略
+
+The extension resolves local HarmonyOS tools in this order:
+扩展对本机 HarmonyOS 工具统一采用下面的顺序：
+
+1. Explicit path settings such as `harmony.hdcPath`, `harmony.hvigorPath`, `harmony.emulatorPath`
+2. Explicit search-root settings such as `harmony.sdkSearchPaths`, `harmony.commandLineToolsSearchPaths`, `harmony.emulatorSearchPaths`, `harmony.devEcoStudioSearchPaths`
+3. `PATH` (except DevEco emulator, which intentionally does not trust a generic `emulator` on PATH)
+4. Well-known platform install locations on macOS / Windows
+
+1. 显式路径设置，例如 `harmony.hdcPath`、`harmony.hvigorPath`、`harmony.emulatorPath`
+2. 显式搜索目录设置，例如 `harmony.sdkSearchPaths`、`harmony.commandLineToolsSearchPaths`、`harmony.emulatorSearchPaths`、`harmony.devEcoStudioSearchPaths`
+3. `PATH`（但 DevEco 模拟器不会信任 PATH 上的泛用 `emulator`）
+4. macOS / Windows 的常见默认安装位置
+
+If auto-detection still misses, run `HarmonyOS: Check SDK / HDC Environment`. The report tells you where the extension searched and which setting you should fill manually.
+如果自动发现仍然失败，直接运行 `HarmonyOS: Check SDK / HDC Environment`。输出会告诉你它查了哪些位置，以及接下来应该手动填写哪个设置项。
 
 ## Extension Settings / 扩展设置
 
 | Setting / 设置项 | Default / 默认值 | Description / 说明 |
 |---------|---------|-------------|
 | `harmony.sdkPath` | `""` | Path to HarmonyOS SDK root / HarmonyOS SDK 根目录路径 |
+| `harmony.sdkSearchPaths` | `[]` | Extra SDK root search directories, checked before PATH / 额外的 SDK 搜索目录，优先于 PATH |
 | `harmony.hdcPath` | `""` | Path to HDC executable (auto-detected if empty) / HDC 可执行文件路径（为空时自动检测） |
+| `harmony.commandLineToolsSearchPaths` | `[]` | Extra HarmonyOS command-line-tools roots, checked before PATH / 额外的命令行工具根目录，优先于 PATH |
+| `harmony.hvigorPath` | `""` | Path to hvigor executable (project `./hvigorw` preferred, DevEco hvigor auto-detected as fallback) / hvigor 可执行文件路径（优先项目 `./hvigorw`，否则自动回退 DevEco hvigor） |
+| `harmony.emulatorPath` | `""` | Path to DevEco emulator executable (auto-detected if empty) / DevEco 模拟器可执行文件路径（为空时自动检测） |
+| `harmony.emulatorSearchPaths` | `[]` | Extra emulator / deployed search roots, checked before default locations / 额外的模拟器与 deployed 根目录搜索路径，优先于默认位置 |
+| `harmony.devEcoStudioSearchPaths` | `[]` | Extra DevEco Studio install roots, checked before default locations / 额外的 DevEco Studio 安装根目录，优先于默认位置 |
+| `harmony.devToolsBrowserPath` | `""` | Path to Chrome / Edge used by WebView DevTools (auto-detected if empty) / WebView DevTools 使用的 Chrome / Edge 路径（为空时自动检测） |
+| `harmony.wifiDefaultPort` | `5555` | Default port appended by `Connect Wi‑Fi Device` when you enter a host/IP without a port / `Connect Wi‑Fi Device` 输入主机/IP 但未填端口时自动补上的默认端口 |
+| `harmony.signingSearchPaths` | `[]` | Extra signing-material search roots (`.p7b`, `.p12`, `.cer`) / 额外的签名材料搜索目录 |
 | `harmony.enableCodeLens` | `true` | Show component references as CodeLens / 以 CodeLens 显示组件引用 |
 | `harmony.enableResourceValidation` | `true` | Validate `$r()` references / 校验 `$r()` 资源引用 |
 | `harmony.autoFormatOnSave` | `false` | Auto-format ArkTS files on save / 保存时自动格式化 ArkTS 文件 |
@@ -326,6 +359,41 @@ Run `HarmonyOS: Preview ArkUI Component` on any `.ets` file to see a live previe
 4. Connect a device via USB or start an emulator, then use the status bar or `HarmonyOS: Select Active Device` / 通过 USB 连接设备或启动模拟器，然后用状态栏或 `HarmonyOS: Select Active Device` 选择当前设备
 5. Press `Cmd+Shift+P` and run `HarmonyOS: Build, Install & Run in Terminal` / 按 `Cmd+Shift+P` 运行 `HarmonyOS: Build, Install & Run in Terminal`
 
+### Wi-Fi Device Workflow / Wi‑Fi 真机工作流
+
+1. Make sure the phone and computer are on the same LAN, and wireless debugging / HDC debugging is enabled on the device.
+2. Run `HarmonyOS: Connect Wi‑Fi Device`.
+3. Enter `IP` or `IP:port`.
+4. The extension will append `harmony.wifiDefaultPort` if you omit the port.
+5. After one successful connection, the last successful `ip:port` is remembered and pre-filled next time.
+
+1. 确认手机和电脑在同一局域网，且设备已开启无线调试 / HDC 调试。
+2. 运行 `HarmonyOS: Connect Wi‑Fi Device`。
+3. 输入 `IP` 或 `IP:port`。
+4. 如果未填写端口，扩展会自动补上 `harmony.wifiDefaultPort`。
+5. 一旦连接成功过一次，下次会自动预填上一次成功的 `ip:port`。
+
+### Real Smoke E2E / 真实 Smoke E2E
+
+`pnpm test:e2e` uses the bundled real HarmonyOS fixture project and your local DevEco / SDK / signing materials.
+`pnpm test:e2e` 会使用仓库内置的真实鸿蒙工程夹具，以及你本机的 DevEco / SDK / 签名材料。
+
+Before running it, confirm:
+运行前请确认：
+
+- `HarmonyOS: Check SDK / HDC Environment` is clean enough for build and emulator use
+- A phone-target HarmonyOS SDK variant is actually usable by `hvigor`, not only present on disk
+- A local signing material group (`.p7b`, `.p12`, `.cer`) exists under `~/.ohos/config` or your configured `harmony.signingSearchPaths`
+- If multiple emulators exist, set `HARMONY_E2E_EMULATOR`
+
+- `HarmonyOS: Check SDK / HDC Environment` 至少已经通过到可构建、可起模拟器的程度
+- 面向 phone 的 HarmonyOS SDK 不只是“目录存在”，而是 `hvigor` 真能用
+- 本机 `~/.ohos/config` 或你配置的 `harmony.signingSearchPaths` 下有可用的 `.p7b` / `.p12` / `.cer`
+- 如果有多个模拟器，先显式设置 `HARMONY_E2E_EMULATOR`
+
+If the local SDK is incomplete, the smoke run will fail fast and tell you which DevEco SDK screen to open and what to repair manually.
+如果本机 SDK 不完整，smoke 会快速失败，并明确告诉你该打开 DevEco 的哪个 SDK 页面，以及需要手动修复什么。
+
 ## Architecture / 架构
 
 Built with a microkernel architecture for minimal footprint:
@@ -334,7 +402,7 @@ Built with a microkernel architecture for minimal footprint:
 - **Lazy-loaded extension bundle / 按需加载扩展包** — keeps startup overhead low / 保持较低启动开销
 - **EventBus + Registry / 事件总线 + 注册表** — extensible plugin system / 可扩展的插件系统
 - **Public API / 公共 API** — third-party extensions can integrate via the exported API / 第三方扩展可通过导出的 API 集成
-- **470+ unit tests / 470+ 个单元测试** — comprehensive test coverage / 全面的测试覆盖
+- **940+ unit tests + host E2E / 940+ 单测 + host E2E** — regression coverage for resolver, emulator orchestration, Wi‑Fi, diagnostics, and editor features / 覆盖 resolver、模拟器编排、Wi‑Fi、诊断和编辑器能力的回归测试
 
 ## All Commands / 所有命令
 
@@ -351,7 +419,9 @@ Built with a microkernel architecture for minimal footprint:
 | `HarmonyOS: Inspect Running UI` | Device UI hierarchy viewer / 设备 UI 层级查看器 |
 | `HarmonyOS: Open Device Mirror` | Mirror device screen with touch interaction / 镜像设备屏幕，支持触控交互 |
 | `HarmonyOS: Start Emulator` | Launch a DevEco Studio emulator / 启动 DevEco Studio 模拟器 |
+| `HarmonyOS: Launch Emulator & Run` | Pick an emulator, wait until it is ready, then build / install / launch the current app / 选择模拟器并等待就绪，再构建 / 安装 / 启动当前应用 |
 | `HarmonyOS: Stop Emulator` | Stop a running emulator / 停止运行中的模拟器 |
+| `HarmonyOS: Connect Wi‑Fi Device` | Connect to a device with `hdc tconn`, remember the last successful target, and offer Run / Debug next actions / 用 `hdc tconn` 连接 Wi‑Fi 真机，记住最近成功目标，并给出运行 / 调试后续动作 |
 | `HarmonyOS: Preview ArkUI Component` | Enhanced component preview / 增强组件预览 |
 | `HarmonyOS: Open Device Logs (hilog)` | Stream device logs / 流式查看设备日志 |
 | `HarmonyOS: Refresh Device List` | Refresh device list / 刷新设备列表 |

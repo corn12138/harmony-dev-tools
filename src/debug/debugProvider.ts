@@ -3,6 +3,7 @@ import { spawn } from 'child_process';
 import { readBundleName, readEntryAbility } from '../utils/projectMetadata';
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
+import { chooseAutoDevice, getActiveDeviceId, getConnectedDeviceState } from '../device/devices';
 
 /**
  * HarmonyOS Debug Configuration Provider
@@ -20,11 +21,11 @@ export class HarmonyDebugConfigProvider implements vscode.DebugConfigurationProv
 
   static readonly type = 'harmonyos';
 
-  resolveDebugConfiguration(
+  async resolveDebugConfiguration(
     folder: vscode.WorkspaceFolder | undefined,
     config: vscode.DebugConfiguration,
     _token?: vscode.CancellationToken
-  ): vscode.ProviderResult<vscode.DebugConfiguration> {
+  ): Promise<vscode.DebugConfiguration> {
     // If launch.json is missing or empty, provide defaults
     if (!config.type && !config.request && !config.name) {
       config.type = HarmonyDebugConfigProvider.type;
@@ -34,8 +35,17 @@ export class HarmonyDebugConfigProvider implements vscode.DebugConfigurationProv
 
     config.bundleName = config.bundleName || '';
     config.abilityName = config.abilityName || 'EntryAbility';
-    config.deviceId = config.deviceId || '';
     config.debugPort = config.debugPort || 9230;
+
+    if (!config.deviceId) {
+      const state = await getConnectedDeviceState();
+      const preferred = chooseAutoDevice(state.devices, getActiveDeviceId());
+      if (preferred) {
+        config.deviceId = preferred.id;
+      } else {
+        config.deviceId = '';
+      }
+    }
 
     return config;
   }
@@ -177,7 +187,10 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
       this.sendResponse(reqSeq, 'launch', {});
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
-      this.sendErrorResponse(reqSeq, 'launch', `Debug launch failed: ${errMsg}`);
+      const recoveryHint = /aa start|ability|bundle/i.test(errMsg)
+        ? ' Build and install the app first, then retry the debug session.'
+        : '';
+      this.sendErrorResponse(reqSeq, 'launch', `Debug launch failed: ${errMsg}${recoveryHint}`);
     }
   }
 

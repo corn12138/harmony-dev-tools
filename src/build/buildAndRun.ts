@@ -2,61 +2,134 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import { buildHvigorCommand } from '../utils/hvigor';
-import { extractHvigorFailureSummary, formatHvigorFailureMessage } from '../utils/hvigorOutput';
+import {
+  extractHvigorFailureSummary,
+  formatHvigorFailureMessage,
+  getHvigorFailureRecoverySteps,
+} from '../utils/hvigorOutput';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { findBuiltHapFiles, readBundleName, readEntryAbility } from '../utils/projectMetadata';
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
-import { ensureConnectedDevice } from '../device/devices';
+import { chooseAutoDevice, getConnectedDeviceState, pickConnectedDevice, setActiveDeviceId } from '../device/devices';
 import { resolveSigningProfileInfo, syncAppBundleNameToSigningProfile } from '../project/signingProfile';
 import { quoteShellArg } from '../utils/shell';
+import { resolveAssembleHapPreflight } from './preflight';
+import { COMMANDS } from '../utils/constants';
 
 const execAsync = promisify(exec);
 let buildOutputChannel: vscode.OutputChannel | undefined;
+const DOC_SDK = 'https://developer.huawei.com/consumer/cn/doc/harmonyos-guides/ide-install-sdk-0000001052513743';
 
 interface BuildAndRunOptions {
   openInspector?: boolean;
+  preferredDeviceId?: string;
+  postLaunchAction?: 'none' | 'mirror' | 'inspector';
+}
+
+export interface BuildAndRunResult {
+  ok: boolean;
+  stage: 'workspace' | 'emulator' | 'device' | 'build' | 'install' | 'launch' | 'completed';
+  message: string;
+  deviceId?: string;
+  hapPath?: string;
+}
+
+interface BuildHapOutcome {
+  ok: boolean;
+  hapPath?: string;
+  message: string;
+}
+
+interface StepOutcome {
+  ok: boolean;
+  message: string;
 }
 
 /**
  * One-click workflow: Build HAP → Install to device → Launch app → (optionally) open UI Inspector
  */
-export async function buildAndRun(options: BuildAndRunOptions = {}): Promise<void> {
+export async function buildAndRun(options: BuildAndRunOptions = {}): Promise<BuildAndRunResult> {
   const folder = getPreferredWorkspaceFolder();
   if (!folder) {
     vscode.window.showErrorMessage('No workspace folder open.');
-    return;
+    return buildAndRunFailure('workspace', 'No workspace folder open.');
   }
 
   // Step 1: Check device
-  const device = await selectDevice();
-  if (!device) return;
-
-  // Step 2: Build HAP
-  const hapPath = await buildHapWithProgress(folder);
-  if (!hapPath) return;
-
-  // Step 3: Install HAP
-  const installed = await installHapToDevice(device, hapPath);
-  if (!installed) return;
-
-  // Step 4: Launch app
-  const launched = await launchApp(device, folder.uri);
-  if (!launched) return;
-
-  // Step 5: Open UI Inspector (optional, default true)
-  if (options.openInspector !== false) {
-    // Small delay to let app render
-    await new Promise((r) => setTimeout(r, 1500));
-    vscode.commands.executeCommand('harmony.uiInspector', device);
+  const device = await selectDevice(options.preferredDeviceId);
+  if (!device) {
+    return buildAndRunFailure(
+      'device',
+      options.preferredDeviceId
+        ? `Target device is no longer online: ${options.preferredDeviceId}`
+        : 'No HarmonyOS device was selected for Build & Run.',
+    );
   }
 
-  vscode.window.showInformationMessage('App is running on device. UI Inspector opened.');
+  // Step 2: Build HAP
+  const buildOutcome = await buildHapWithProgress(folder);
+  if (!buildOutcome.ok || !buildOutcome.hapPath) {
+    return buildAndRunFailure('build', buildOutcome.message, { deviceId: device });
+  }
+  const hapPath = buildOutcome.hapPath;
+
+  // Step 3: Install HAP
+  const installOutcome = await installHapToDevice(device, hapPath);
+  if (!installOutcome.ok) {
+    return buildAndRunFailure('install', installOutcome.message, { deviceId: device, hapPath });
+  }
+
+  // Step 4: Launch app
+  const launchOutcome = await launchApp(device, folder.uri);
+  if (!launchOutcome.ok) {
+    return buildAndRunFailure('launch', launchOutcome.message, { deviceId: device, hapPath });
+  }
+
+  const postLaunchAction = resolvePostLaunchAction(options);
+  if (postLaunchAction !== 'none') {
+    await new Promise((r) => setTimeout(r, 1500));
+    if (postLaunchAction === 'inspector') {
+      void vscode.commands.executeCommand(COMMANDS.UI_INSPECTOR, device);
+    } else if (postLaunchAction === 'mirror') {
+      void vscode.commands.executeCommand(COMMANDS.DEVICE_MIRROR, device);
+    }
+  }
+
+  const successMessage = postLaunchAction === 'inspector'
+    ? 'App is running on device. UI Inspector opened.'
+    : postLaunchAction === 'mirror'
+      ? 'App is running on device. Device Mirror opened.'
+      : 'App is running on device.';
+  vscode.window.showInformationMessage(successMessage);
+  return buildAndRunSuccess(successMessage, device, hapPath);
 }
 
-async function selectDevice(): Promise<string | null> {
-  const picked = await ensureConnectedDevice({
+async function selectDevice(preferredDeviceId?: string): Promise<string | null> {
+  const state = await getConnectedDeviceState();
+  if (state.devices.length === 0) {
+    await promptWhenNoDeviceAvailable(state.error?.message);
+    return null;
+  }
+
+  if (preferredDeviceId) {
+    const preferred = state.devices.find((device) => device.id === preferredDeviceId);
+    if (!preferred) {
+      vscode.window.showErrorMessage(`Target device is no longer online: ${preferredDeviceId}`);
+      return null;
+    }
+    setActiveDeviceId(preferred.id);
+    return preferred.id;
+  }
+
+  const auto = chooseAutoDevice(state.devices);
+  if (auto) {
+    setActiveDeviceId(auto.id);
+    return auto.id;
+  }
+
+  const picked = await pickConnectedDevice({
     placeHolder: 'Select target device for Build & Run',
+    forcePick: true,
   });
   if (!picked) {
     return null;
@@ -64,10 +137,53 @@ async function selectDevice(): Promise<string | null> {
   return picked.id;
 }
 
-async function buildHapWithProgress(folder: vscode.WorkspaceFolder): Promise<string | null> {
+async function buildHapWithProgress(folder: vscode.WorkspaceFolder): Promise<BuildHapOutcome> {
   const rootPath = folder.uri.fsPath;
-  const command = buildHvigorCommand({ task: 'assembleHap' });
   const outputChannel = getBuildOutputChannel();
+  const preflight = await resolveAssembleHapPreflight(rootPath);
+  const hvigorExecution = preflight.hvigorExecution;
+  const command = hvigorExecution.command;
+
+  if (preflight.blockingMessage) {
+    outputChannel.clear();
+    outputChannel.appendLine(`[cwd] ${rootPath}`);
+    outputChannel.appendLine(`[preflight] ${preflight.blockingMessage}`);
+    for (const warning of preflight.warnings) {
+      outputChannel.appendLine(`[preflight] ${warning}`);
+    }
+    for (const step of preflight.signingRecoveryHint?.steps ?? []) {
+      outputChannel.appendLine(`[help] ${step}`);
+    }
+    outputChannel.show();
+    void vscode.window.showErrorMessage(
+      preflight.blockingMessage,
+      ...(preflight.signingRecoveryHint?.copyText ? ['Copy Signing Paths'] : []),
+      ...(preflight.signingRecoveryHint ? ['Open build-profile.json5'] : []),
+      'Check Environment',
+      'Open Build Log',
+    ).then(async (action) => {
+      if (action === 'Copy Signing Paths' && preflight.signingRecoveryHint?.copyText) {
+        await vscode.env.clipboard.writeText(preflight.signingRecoveryHint.copyText);
+        vscode.window.showInformationMessage('已复制签名路径建议。把它们填到 build-profile.json5 的 profile / storeFile / certpath。');
+        return;
+      }
+
+      if (action === 'Open build-profile.json5') {
+        await openWorkspaceFile(folder.uri, 'build-profile.json5');
+        return;
+      }
+
+      if (action === 'Check Environment') {
+        await vscode.commands.executeCommand(COMMANDS.CHECK_ENVIRONMENT);
+        return;
+      }
+
+      if (action === 'Open Build Log') {
+        outputChannel.show();
+      }
+    });
+    return { ok: false, message: preflight.blockingMessage };
+  }
 
   return vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: 'HarmonyOS', cancellable: true },
@@ -75,6 +191,12 @@ async function buildHapWithProgress(folder: vscode.WorkspaceFolder): Promise<str
       progress.report({ message: 'Building HAP...' });
       outputChannel.clear();
       outputChannel.appendLine(`[cwd] ${rootPath}`);
+      if (hvigorExecution.source === 'external' && hvigorExecution.executablePath) {
+        outputChannel.appendLine(`[hvigor] Fallback to external hvigor: ${hvigorExecution.executablePath}`);
+      }
+      for (const warning of preflight.warnings) {
+        outputChannel.appendLine(`[preflight] ${warning}`);
+      }
       outputChannel.appendLine(`[cmd] ${command}`);
       outputChannel.appendLine('');
 
@@ -83,6 +205,7 @@ async function buildHapWithProgress(folder: vscode.WorkspaceFolder): Promise<str
           cwd: rootPath,
           timeout: 120_000,
           maxBuffer: 10 * 1024 * 1024,
+          ...(hvigorExecution.environment ? { env: hvigorExecution.environment } : {}),
         });
 
         // Allow cancellation
@@ -93,12 +216,14 @@ async function buildHapWithProgress(folder: vscode.WorkspaceFolder): Promise<str
         const { stdout, stderr } = await buildPromise;
         appendBuildOutput(outputChannel, stdout, stderr);
 
-        if (token.isCancellationRequested) return null;
+        if (token.isCancellationRequested) {
+          return { ok: false, message: 'Build was cancelled.' };
+        }
 
         // Check for build errors
         if (stderr && stderr.includes('ERROR')) {
-          await presentBuildFailure(folder.uri, outputChannel, `${stdout}\n${stderr}`);
-          return null;
+          presentBuildFailure(folder.uri, outputChannel, `${stdout}\n${stderr}`);
+          return { ok: false, message: 'Build failed. See HarmonyOS Build output for details.' };
         }
 
         progress.report({ message: 'Locating HAP output...' });
@@ -109,17 +234,21 @@ async function buildHapWithProgress(folder: vscode.WorkspaceFolder): Promise<str
           vscode.window.showErrorMessage(
             'Build completed but no .hap file found. Check build output.'
           );
-          return null;
+          return { ok: false, message: 'Build completed but no .hap file was found.' };
         }
 
-        return hapPath;
+        return { ok: true, hapPath, message: `Built HAP: ${hapPath}` };
       } catch (err: unknown) {
         if (!token.isCancellationRequested) {
           const failureOutput = extractExecFailureOutput(err);
           appendBuildOutput(outputChannel, failureOutput.stdout, failureOutput.stderr, failureOutput.message);
-          await presentBuildFailure(folder.uri, outputChannel, failureOutput.combined);
+          presentBuildFailure(folder.uri, outputChannel, failureOutput.combined);
+          return {
+            ok: false,
+            message: extractBuildFailureMessage(failureOutput.combined, failureOutput.message),
+          };
         }
-        return null;
+        return { ok: false, message: 'Build was cancelled.' };
       }
     }
   );
@@ -155,21 +284,32 @@ async function findHapOutput(folder: vscode.WorkspaceFolder): Promise<string | n
   return picked?.fsPath ?? null;
 }
 
-async function installHapToDevice(device: string, hapPath: string): Promise<boolean> {
+async function installHapToDevice(device: string, hapPath: string): Promise<StepOutcome> {
   return vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: 'HarmonyOS' },
     async (progress) => {
       progress.report({ message: `Installing to ${device}...` });
-      try {
-        await execHdc([...buildHdcTargetArgs(device), 'install', hapPath], { timeout: 30_000 });
-        return true;
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        vscode.window.showErrorMessage(`Install failed: ${msg.slice(0, 300)}`);
-        return false;
+      const maxAttempts = isLikelyEmulatorTarget(device) ? 2 : 1;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+          await execHdc([...buildHdcTargetArgs(device), 'install', hapPath], { timeout: 30_000 });
+          return { ok: true, message: `Installed ${path.basename(hapPath)} to ${device}.` };
+        } catch (err: unknown) {
+          if (attempt < maxAttempts) {
+            progress.report({ message: `Install retry ${attempt}/${maxAttempts - 1} after emulator warm-up...` });
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            continue;
+          }
+
+          const msg = err instanceof Error ? err.message : String(err);
+          vscode.window.showErrorMessage(`Install failed: ${msg.slice(0, 300)}`);
+          return { ok: false, message: `Install failed: ${msg.slice(0, 300)}` };
+        }
       }
+
+      return { ok: false, message: `Install failed for ${path.basename(hapPath)}.` };
     }
-  ) ?? false;
+  ) ?? { ok: false, message: `Install failed for ${path.basename(hapPath)}.` };
 }
 
 function getBuildOutputChannel(): vscode.OutputChannel {
@@ -196,58 +336,83 @@ function appendBuildOutput(
   }
 }
 
-async function presentBuildFailure(
+function presentBuildFailure(
   rootUri: vscode.Uri,
   outputChannel: vscode.OutputChannel,
   combinedOutput: string,
-): Promise<void> {
+): void {
   const summary = extractHvigorFailureSummary(combinedOutput);
-  const currentBundleName = summary?.kind === 'bundleNameMismatch'
-    ? await readBundleName(rootUri)
-    : undefined;
-  const signingInfo = summary?.kind === 'bundleNameMismatch'
-    ? await resolveSigningProfileInfo(rootUri)
-    : undefined;
-  const syncLabel = signingInfo?.bundleName && signingInfo.bundleName !== currentBundleName
-    ? `Sync AppScope/app.json5 to ${signingInfo.bundleName}`
-    : undefined;
+  void (async () => {
+    const currentBundleName = summary?.kind === 'bundleNameMismatch'
+      ? await readBundleName(rootUri)
+      : undefined;
+    const signingInfo = summary?.kind === 'bundleNameMismatch'
+      ? await resolveSigningProfileInfo(rootUri)
+      : undefined;
+    const syncLabel = signingInfo?.bundleName && signingInfo.bundleName !== currentBundleName
+      ? `Sync AppScope/app.json5 to ${signingInfo.bundleName}`
+      : undefined;
 
-  const message = summary?.kind === 'bundleNameMismatch' && signingInfo?.bundleName
-    ? buildBundleNameMismatchMessage(summary, currentBundleName, signingInfo.bundleName)
-    : (summary ? formatHvigorFailureMessage(summary) : 'Build failed. See HarmonyOS Build output for details.');
+    const message = summary?.kind === 'bundleNameMismatch' && signingInfo?.bundleName
+      ? buildBundleNameMismatchMessage(summary, currentBundleName, signingInfo.bundleName)
+      : (summary ? formatHvigorFailureMessage(summary) : 'Build failed. See HarmonyOS Build output for details.');
+    const helpActions = summary?.kind === 'sdkLicenseNotAccepted'
+      || summary?.kind === 'sdkHomeMissing'
+      || summary?.kind === 'sdkPathNotWritable'
+      || summary?.kind === 'sdkComponentMissing'
+      ? ['Check Environment', 'Open SDK Docs']
+      : [];
 
-  const actions = [
-    ...(syncLabel ? [syncLabel] : []),
-    ...(summary?.kind === 'bundleNameMismatch' ? ['Open AppScope/app.json5', 'Open build-profile.json5'] : []),
-    'Open Build Log',
-  ];
+    const actions = [
+      ...(syncLabel ? [syncLabel] : []),
+      ...(summary?.kind === 'bundleNameMismatch' ? ['Open AppScope/app.json5', 'Open build-profile.json5'] : []),
+      ...helpActions,
+      'Open Build Log',
+    ];
 
-  const action = await vscode.window.showErrorMessage(
-    message,
-    ...actions,
-  );
-
-  if (action === syncLabel) {
-    const updated = await syncAppBundleNameToSigningProfile(rootUri);
-    if (updated) {
-      vscode.window.showInformationMessage(`AppScope/app.json5 已同步为签名 profile 中的 bundleName: ${updated}`);
+    if (summary) {
+      for (const step of getHvigorFailureRecoverySteps(summary)) {
+        outputChannel.appendLine(`[help] ${step}`);
+      }
     }
-    return;
-  }
 
-  if (action === 'Open AppScope/app.json5') {
-    await openWorkspaceFile(rootUri, 'AppScope', 'app.json5');
-    return;
-  }
+    const action = await vscode.window.showErrorMessage(
+      message,
+      ...actions,
+    );
 
-  if (action === 'Open build-profile.json5') {
-    await openWorkspaceFile(rootUri, 'build-profile.json5');
-    return;
-  }
+    if (action === syncLabel) {
+      const updated = await syncAppBundleNameToSigningProfile(rootUri);
+      if (updated) {
+        vscode.window.showInformationMessage(`AppScope/app.json5 已同步为签名 profile 中的 bundleName: ${updated}`);
+      }
+      return;
+    }
 
-  if (action === 'Open Build Log') {
-    outputChannel.show();
-  }
+    if (action === 'Open AppScope/app.json5') {
+      await openWorkspaceFile(rootUri, 'AppScope', 'app.json5');
+      return;
+    }
+
+    if (action === 'Open build-profile.json5') {
+      await openWorkspaceFile(rootUri, 'build-profile.json5');
+      return;
+    }
+
+    if (action === 'Check Environment') {
+      await vscode.commands.executeCommand(COMMANDS.CHECK_ENVIRONMENT);
+      return;
+    }
+
+    if (action === 'Open SDK Docs') {
+      await vscode.env.openExternal(vscode.Uri.parse(DOC_SDK));
+      return;
+    }
+
+    if (action === 'Open Build Log') {
+      outputChannel.show();
+    }
+  })();
 }
 
 function buildBundleNameMismatchMessage(
@@ -299,13 +464,16 @@ function toString(value: string | Buffer | undefined): string {
   return Buffer.isBuffer(value) ? value.toString('utf8') : value;
 }
 
-async function launchApp(device: string, rootUri: vscode.Uri): Promise<boolean> {
+async function launchApp(device: string, rootUri: vscode.Uri): Promise<StepOutcome> {
   const bundleName = await readBundleName(rootUri);
   if (!bundleName) {
     vscode.window.showErrorMessage(
       'Cannot find bundleName in AppScope/app.json5. Is this a HarmonyOS project?'
     );
-    return false;
+    return {
+      ok: false,
+      message: 'Cannot find bundleName in AppScope/app.json5. Is this a HarmonyOS project?',
+    };
   }
 
   const abilityName = await readEntryAbility(rootUri);
@@ -318,10 +486,87 @@ async function launchApp(device: string, rootUri: vscode.Uri): Promise<boolean> 
       [...buildHdcTargetArgs(device), 'shell', `aa start -a ${safeAbility} -b ${safeBundle}`],
       { timeout: 10_000 }
     );
-    return true;
+    return {
+      ok: true,
+      message: `Launched ${bundleName}/${fullAbility} on ${device}.`,
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     vscode.window.showErrorMessage(`Launch failed: ${msg.slice(0, 300)}`);
-    return false;
+    return {
+      ok: false,
+      message: `Launch failed: ${msg.slice(0, 300)}`,
+    };
   }
+}
+
+function resolvePostLaunchAction(options: BuildAndRunOptions): 'none' | 'mirror' | 'inspector' {
+  if (options.postLaunchAction) {
+    return options.postLaunchAction;
+  }
+
+  return options.openInspector === false ? 'none' : 'inspector';
+}
+
+async function promptWhenNoDeviceAvailable(errorMessage?: string): Promise<void> {
+  const action = await vscode.window.showWarningMessage(
+    errorMessage
+      ? `${errorMessage} Launch an emulator, connect a Wi-Fi device, or fix the environment before running the app.`
+      : 'No HarmonyOS devices connected. Launch an emulator, connect a Wi-Fi device, or fix the environment before running the app.',
+    'Connect Wi-Fi Device',
+    'Launch Emulator & Run',
+    'Select Device',
+    'Check Environment',
+  );
+
+  if (action === 'Connect Wi-Fi Device') {
+    await vscode.commands.executeCommand(COMMANDS.CONNECT_WIFI_DEVICE);
+    return;
+  }
+
+  if (action === 'Launch Emulator & Run') {
+    await vscode.commands.executeCommand(COMMANDS.LAUNCH_EMULATOR_AND_RUN);
+    return;
+  }
+
+  if (action === 'Select Device') {
+    await vscode.commands.executeCommand(COMMANDS.SELECT_DEVICE);
+    return;
+  }
+
+  if (action === 'Check Environment') {
+    await vscode.commands.executeCommand(COMMANDS.CHECK_ENVIRONMENT);
+  }
+}
+
+function isLikelyEmulatorTarget(deviceId: string): boolean {
+  return deviceId.includes('127.0.0.1') || deviceId.includes('localhost') || deviceId.includes('emulator');
+}
+
+function buildAndRunFailure(
+  stage: BuildAndRunResult['stage'],
+  message: string,
+  extra: Partial<Pick<BuildAndRunResult, 'deviceId' | 'hapPath'>> = {},
+): BuildAndRunResult {
+  return {
+    ok: false,
+    stage,
+    message,
+    ...extra,
+  };
+}
+
+function buildAndRunSuccess(message: string, deviceId: string, hapPath: string): BuildAndRunResult {
+  return {
+    ok: true,
+    stage: 'completed',
+    message,
+    deviceId,
+    hapPath,
+  };
+}
+
+function extractBuildFailureMessage(combinedOutput: string, fallbackMessage: string): string {
+  const summary = extractHvigorFailureSummary(combinedOutput);
+  return summary ? formatHvigorFailureMessage(summary) : fallbackMessage;
 }

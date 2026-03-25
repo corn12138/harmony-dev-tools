@@ -12,13 +12,19 @@ const createdTreeViews: Array<{ id: string; options: any }> = [];
 const debugSessions: Array<{ folder: any; config: any }> = [];
 const statusBarItems: MockStatusBarItem[] = [];
 const fileSystemWatchers: MockFileSystemWatcher[] = [];
+const createdTerminals: MockTerminal[] = [];
+const executedTasks: Task[] = [];
 const diagnosticCollections = new Map<string, MockDiagnosticCollection>();
+const configurationValues = new Map<string, any>();
 let nextQuickPickResult: any = undefined;
+let nextOpenDialogResult: any = undefined;
+let nextInputBoxResult: any = undefined;
 let openTextDocumentEmitter: EventEmitter<any>;
 let saveTextDocumentEmitter: EventEmitter<any>;
 let changeTextDocumentEmitter: EventEmitter<any>;
 let workspaceFoldersEmitter: EventEmitter<any>;
 let configurationEmitter: EventEmitter<any>;
+let closeTerminalEmitter: EventEmitter<any>;
 
 export enum CompletionItemKind {
   Text = 0,
@@ -126,6 +132,7 @@ function resetWorkspaceEmitters(): void {
   changeTextDocumentEmitter = new EventEmitter<any>();
   workspaceFoldersEmitter = new EventEmitter<any>();
   configurationEmitter = new EventEmitter<any>();
+  closeTerminalEmitter = new EventEmitter<any>();
 }
 
 resetWorkspaceEmitters();
@@ -364,6 +371,30 @@ class MockStatusBarItem {
   }
 }
 
+class MockTerminal {
+  readonly sentText: Array<{ text: string; addNewLine?: boolean }> = [];
+  disposed = false;
+  visible = false;
+
+  constructor(
+    public readonly name: string,
+    public readonly options?: any,
+  ) {}
+
+  show(): void {
+    this.visible = true;
+  }
+
+  sendText(text: string, addNewLine?: boolean): void {
+    this.sentText.push({ text, addNewLine });
+  }
+
+  dispose(): void {
+    this.disposed = true;
+    closeTerminalEmitter.fire(this);
+  }
+}
+
 class MockFileSystemWatcher {
   private readonly createEmitter = new EventEmitter<Uri>();
   private readonly changeEmitter = new EventEmitter<Uri>();
@@ -408,11 +439,38 @@ function createEventRegistration(): Disposable {
   return noopDisposable();
 }
 
+function toConfigurationKey(section: string | undefined, key: string): string {
+  return section ? `${section}.${key}` : key;
+}
+
+function createConfigurationEvent(changedKey: string) {
+  return {
+    affectsConfiguration: (candidate: string) =>
+      candidate === changedKey
+      || changedKey.startsWith(`${candidate}.`)
+      || candidate.startsWith(`${changedKey}.`),
+  };
+}
+
 export const workspace = {
   workspaceFolders: [] as any[],
   textDocuments: [] as any[],
-  getConfiguration: (_section?: string) => ({
-    get: (_key: string, defaultValue?: any) => defaultValue,
+  getConfiguration: (section?: string) => ({
+    get: (key: string, defaultValue?: any) => {
+      const fullKey = toConfigurationKey(section, key);
+      return configurationValues.has(fullKey)
+        ? configurationValues.get(fullKey)
+        : defaultValue;
+    },
+    update: async (key: string, value: any) => {
+      const fullKey = toConfigurationKey(section, key);
+      if (value === undefined) {
+        configurationValues.delete(fullKey);
+      } else {
+        configurationValues.set(fullKey, value);
+      }
+      configurationEmitter.fire(createConfigurationEvent(fullKey));
+    },
   }),
   findFiles: async () => [],
   createFileSystemWatcher: (_pattern: any) => {
@@ -440,6 +498,16 @@ export const window = {
   showInformationMessage: async (..._args: any[]) => undefined,
   showWarningMessage: async (..._args: any[]) => undefined,
   showErrorMessage: async (..._args: any[]) => undefined,
+  showInputBox: async () => {
+    const result = nextInputBoxResult;
+    nextInputBoxResult = undefined;
+    return result;
+  },
+  showOpenDialog: async () => {
+    const result = nextOpenDialogResult;
+    nextOpenDialogResult = undefined;
+    return result;
+  },
   showQuickPick: async (items: any) => {
     const resolvedItems = await Promise.resolve(items);
     if (nextQuickPickResult !== undefined) {
@@ -465,6 +533,12 @@ export const window = {
     statusBarItems.push(item);
     return item;
   },
+  createTerminal: (options: any) => {
+    const terminal = new MockTerminal(options?.name ?? 'terminal', options);
+    createdTerminals.push(terminal);
+    return terminal;
+  },
+  onDidCloseTerminal: (listener: (terminal: any) => void) => closeTerminalEmitter.event(listener),
   withProgress: async (_options: any, task: (progress: any, token: any) => any) =>
     task(
       { report: (_value: any) => {} },
@@ -511,6 +585,10 @@ export const debug = {
 
 export const tasks = {
   registerTaskProvider: () => noopDisposable(),
+  executeTask: async (task: Task) => {
+    executedTasks.push(task);
+    return undefined;
+  },
 };
 
 export const env = {
@@ -544,6 +622,14 @@ export function __getFileSystemWatchers(): MockFileSystemWatcher[] {
   return fileSystemWatchers.slice();
 }
 
+export function __getCreatedTerminals(): MockTerminal[] {
+  return createdTerminals.slice();
+}
+
+export function __getExecutedTasks(): Task[] {
+  return executedTasks.slice();
+}
+
 export function __getDiagnosticCollection(name: string): MockDiagnosticCollection | undefined {
   return diagnosticCollections.get(name);
 }
@@ -567,6 +653,18 @@ export function __setQuickPickResult(value: any): void {
   nextQuickPickResult = value;
 }
 
+export function __setOpenDialogResult(value: any): void {
+  nextOpenDialogResult = value;
+}
+
+export function __setInputBoxResult(value: any): void {
+  nextInputBoxResult = value;
+}
+
+export function __setConfigurationValue(key: string, value: any): void {
+  configurationValues.set(key, value);
+}
+
 export function __reset(): void {
   registeredCommands.clear();
   executedCommands.length = 0;
@@ -574,8 +672,13 @@ export function __reset(): void {
   debugSessions.length = 0;
   statusBarItems.length = 0;
   fileSystemWatchers.length = 0;
+  createdTerminals.length = 0;
+  executedTasks.length = 0;
   diagnosticCollections.clear();
+  configurationValues.clear();
   nextQuickPickResult = undefined;
+  nextOpenDialogResult = undefined;
+  nextInputBoxResult = undefined;
   workspace.workspaceFolders = [];
   workspace.textDocuments = [];
   window.activeTextEditor = undefined;
@@ -584,5 +687,6 @@ export function __reset(): void {
   changeTextDocumentEmitter.dispose();
   workspaceFoldersEmitter.dispose();
   configurationEmitter.dispose();
+  closeTerminalEmitter.dispose();
   resetWorkspaceEmitters();
 }

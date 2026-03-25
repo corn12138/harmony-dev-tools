@@ -222,6 +222,24 @@ describe('Emulator Manager', () => {
       })).toEqual(['-hvd', 'Mate 70 Pro']);
     });
 
+    it('should include deployed root and image root when launch metadata is available', () => {
+      expect(getEmulatorLaunchArgs({
+        name: 'Mate 70 Pro',
+        dir: '/Users/test/.Huawei/Emulator/deployed/Mate 70 Pro',
+        platform: 'unknown',
+        running: false,
+        launchRoot: '/Users/test/.Huawei/Emulator/deployed',
+        imageRoot: '/Users/test/Library/Huawei/Sdk',
+      })).toEqual([
+        '-hvd',
+        'Mate 70 Pro',
+        '-path',
+        '/Users/test/.Huawei/Emulator/deployed',
+        '-imageRoot',
+        '/Users/test/Library/Huawei/Sdk',
+      ]);
+    });
+
     function isEmulatorDevice(id: string): boolean {
       return id.includes('127.0.0.1') || id.includes('localhost') || id.includes('emulator');
     }

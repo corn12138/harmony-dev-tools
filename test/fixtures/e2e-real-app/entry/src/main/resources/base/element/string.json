@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "Harmony smoke module"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "Smoke entry ability"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Harmony Smoke"
+    }
+  ]
+}

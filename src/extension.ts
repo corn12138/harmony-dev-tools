@@ -5,7 +5,9 @@ import { ModuleManager } from './core/module';
 import { Logger } from './utils/logger';
 import { createPublicAPI, HarmonyDevToolsAPI } from './core/api';
 import { COMMANDS, LANGUAGE_ID } from './utils/constants';
+import { registerToolPathCacheInvalidation } from './utils/config';
 import { getPreferredWorkspaceFolder } from './utils/workspace';
+import { initializeWifiConnectionStorage } from './device/wifiConnection';
 
 // Module imports — only type references at top level, actual code loaded dynamically
 import { ProjectDetectorModule } from './project/projectDetector';
@@ -18,6 +20,8 @@ export function activate(context: vscode.ExtensionContext): HarmonyDevToolsAPI {
 
   // ---- Initialize microkernel ----
   context.subscriptions.push(eventBus, registry, logger);
+  context.subscriptions.push(registerToolPathCacheInvalidation());
+  initializeWifiConnectionStorage(context.globalState as any);
 
   const moduleContext = { extensionContext: context, eventBus, registry, logger };
   moduleManager = new ModuleManager(moduleContext);
@@ -299,7 +303,7 @@ function registerDxEnhancements(context: vscode.ExtensionContext): void {
 // ---- Layer 2: Command-triggered features ----
 
 function registerLazyCommands(context: vscode.ExtensionContext): void {
-  const lazyCommand = (commandId: string, handler: (...args: any[]) => Promise<void>) => {
+  const lazyCommand = (commandId: string, handler: (...args: any[]) => Promise<unknown>) => {
     context.subscriptions.push(
       vscode.commands.registerCommand(commandId, handler)
     );
@@ -420,7 +424,15 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
 
   lazyCommand(COMMANDS.BUILD_AND_RUN, async () => {
     const { buildAndRun } = await import('./build/buildAndRun');
-    await buildAndRun({ openInspector: true });
+    return await buildAndRun({ openInspector: true });
+  });
+
+  lazyCommand(COMMANDS.LAUNCH_EMULATOR_AND_RUN, async (commandArg?: unknown) => {
+    const [{ launchEmulatorAndRun }, { extractEmulatorNameFromCommandArg }] = await Promise.all([
+      import('./device/launchEmulatorAndRun'),
+      import('./device/commandArgs'),
+    ]);
+    return await launchEmulatorAndRun(extractEmulatorNameFromCommandArg(commandArg));
   });
 
   lazyCommand(COMMANDS.TERMINAL_BUILD_RUN, async () => {
@@ -434,13 +446,45 @@ function registerLazyCommands(context: vscode.ExtensionContext): void {
   });
 
   lazyCommand(COMMANDS.DEBUG_APP, async () => {
-    // Start a debug session using our HarmonyOS debug type
     const folder = getPreferredWorkspaceFolder();
+    const [{ ensureConnectedDevice, getActiveDeviceId }, { buildAndRun }] = await Promise.all([
+      import('./device/devices'),
+      import('./build/buildAndRun'),
+    ]);
+    const device = await ensureConnectedDevice({
+      preferredId: getActiveDeviceId(),
+      placeHolder: 'Select a HarmonyOS device to debug',
+    });
+    if (!device) {
+      return;
+    }
+
+    const buildResult = await buildAndRun({
+      preferredDeviceId: device.id,
+      postLaunchAction: 'none',
+    });
+    if (!buildResult?.ok) {
+      return buildResult;
+    }
+
     await vscode.debug.startDebugging(folder, {
       type: 'harmonyos',
       request: 'launch',
       name: 'Debug HarmonyOS App',
+      deviceId: device.id,
     });
+  });
+
+  lazyCommand(COMMANDS.CONNECT_WIFI_DEVICE, async (commandArg?: unknown) => {
+    const { connectWifiDevice } = await import('./device/wifiConnection');
+    if (typeof commandArg === 'string') {
+      return connectWifiDevice(commandArg);
+    }
+    if (commandArg && typeof commandArg === 'object' && 'address' in (commandArg as Record<string, unknown>)) {
+      const address = (commandArg as { address?: unknown }).address;
+      return connectWifiDevice(typeof address === 'string' ? address : undefined);
+    }
+    return connectWifiDevice();
   });
 
   lazyCommand(COMMANDS.MIGRATE_V1_TO_V2, async () => {
