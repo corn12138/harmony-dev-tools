@@ -1,7 +1,9 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const wrapperName = process.platform === 'win32' ? 'hvigorw.bat' : 'hvigorw';
 
 const mockResolveHvigorPath = vi.fn<() => Promise<string | null>>();
 const mockResolveToolPath = vi.fn<() => Promise<string | null>>();
@@ -72,6 +74,8 @@ vi.mock('../src/project/localSigning', () => ({
 }));
 
 describe('checkEnvironment hvigor reporting', () => {
+  afterEach(() => vi.restoreAllMocks());
+
   beforeEach(async () => {
     vi.clearAllMocks();
     const vscode = await import('vscode');
@@ -116,7 +120,7 @@ describe('checkEnvironment hvigor reporting', () => {
     try {
       fs.writeFileSync(path.join(root, 'build-profile.json5'), '{}', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );
@@ -144,7 +148,7 @@ describe('checkEnvironment hvigor reporting', () => {
     try {
       fs.writeFileSync(path.join(root, 'build-profile.json5'), '{}', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );
@@ -167,6 +171,9 @@ describe('checkEnvironment hvigor reporting', () => {
   });
 
   it('surfaces macOS readlink warnings even when the local wrapper is otherwise valid', async () => {
+    const hvigor = await import('../src/utils/hvigor');
+    const inspect = hvigor.inspectHvigorProjectSetup;
+    vi.spyOn(hvigor, 'inspectHvigorProjectSetup').mockImplementation(root => inspect(root, 'darwin'));
     const vscode = await import('vscode');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harmony-env-readlink-'));
     try {
@@ -318,7 +325,7 @@ describe('checkEnvironment hvigor reporting', () => {
       fs.mkdirSync(path.join(root, 'hvigor'), { recursive: true });
       fs.writeFileSync(path.join(root, 'hvigor', 'hvigor-wrapper.js'), '// wrapper', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );
@@ -362,7 +369,7 @@ describe('checkEnvironment hvigor reporting', () => {
       fs.mkdirSync(path.join(root, 'hvigor'), { recursive: true });
       fs.writeFileSync(path.join(root, 'hvigor', 'hvigor-wrapper.js'), '// wrapper', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );
@@ -410,7 +417,7 @@ describe('checkEnvironment hvigor reporting', () => {
       fs.mkdirSync(path.join(root, 'hvigor'), { recursive: true });
       fs.writeFileSync(path.join(root, 'hvigor', 'hvigor-wrapper.js'), '// wrapper', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );
@@ -438,7 +445,7 @@ describe('checkEnvironment hvigor reporting', () => {
       fs.mkdirSync(path.join(root, 'hvigor'), { recursive: true });
       fs.writeFileSync(path.join(root, 'hvigor', 'hvigor-wrapper.js'), '// wrapper', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );
@@ -479,7 +486,7 @@ describe('checkEnvironment hvigor reporting', () => {
       fs.mkdirSync(path.join(root, 'hvigor'), { recursive: true });
       fs.writeFileSync(path.join(root, 'hvigor', 'hvigor-wrapper.js'), '// wrapper', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );
@@ -519,7 +526,7 @@ describe('checkEnvironment hvigor reporting', () => {
       fs.mkdirSync(path.join(root, 'hvigor'), { recursive: true });
       fs.writeFileSync(path.join(root, 'hvigor', 'hvigor-wrapper.js'), '// wrapper', 'utf8');
       fs.writeFileSync(
-        path.join(root, 'hvigorw'),
+        path.join(root, wrapperName),
         '#!/bin/bash\nHVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js\n',
         'utf8',
       );

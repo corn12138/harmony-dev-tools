@@ -73,8 +73,11 @@ describe('terminal build runner hvigor fallback', () => {
     expect(terminals).toHaveLength(1);
     const command = terminals[0].sentText[0].text;
     expect(command).toContain("'/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw' assembleHap --no-daemon");
-    expect(command).toContain('/mock/hdc -t emulator-5554 install "$HAP_FILE"');
-    expect(command).toContain('/mock/hdc -t emulator-5554 shell aa start -a EntryAbility -b com.demo.app');
+    expect(command).toContain(process.platform === 'win32'
+      ? '/mock/hdc -t emulator-5554 install $hap.FullName'
+      : '/mock/hdc -t emulator-5554 install "$HAP_FILE"');
+    expect(terminals[0].options.shellPath).toBe(process.platform === 'win32' ? 'powershell.exe' : undefined);
+    expect(command).toContain("/mock/hdc -t emulator-5554 shell aa start -a 'EntryAbility' -b 'com.demo.app'");
   });
 
   it('shows a preflight error and does not create a terminal when no hvigor is available', async () => {
@@ -102,5 +105,22 @@ describe('terminal build runner hvigor fallback', () => {
 
     expect(errorSpy).toHaveBeenCalledWith('broken signing');
     expect((vscode as any).__getCreatedTerminals()).toHaveLength(0);
+  });
+
+  it('renders PowerShell progress as a literal when project metadata contains expressions and quotes', async () => {
+    const vscode = await import('vscode');
+    const { terminalBuildAndRun } = await import('../src/build/terminalRunner');
+    mockResolveAssembleHapPreflight.mockResolvedValue({ hvigorExecution: { command: 'build' } });
+    mockReadBundleName.mockResolvedValue("com.demo.$(Write-Output BAD)'app");
+    mockReadEntryAbility.mockResolvedValue('Entry "quoted"');
+    const descriptor = Object.getOwnPropertyDescriptor(process, 'platform')!;
+    try {
+      Object.defineProperty(process, 'platform', { value: 'win32' });
+      await terminalBuildAndRun();
+    } finally {
+      Object.defineProperty(process, 'platform', descriptor);
+    }
+    const command = (vscode as any).__getCreatedTerminals()[0].sentText[0].text;
+    expect(command).toContain("Write-Host '[4/4] Launching com.demo.$(Write-Output BAD)''app/Entry \"quoted\"...'");
   });
 });

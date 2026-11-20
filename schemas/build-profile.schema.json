@@ -39,9 +39,9 @@
             "properties": {
               "name": { "type": "string", "description": "产品名称 (default/free/paid)" },
               "signingConfig": { "type": "string" },
-              "compatibleSdkVersion": { "type": ["string", "number"], "description": "最低兼容 SDK 版本 (e.g., 14 or '5.0.5(17)')" },
-              "targetSdkVersion": { "type": ["string", "number"], "description": "目标 SDK 版本 (e.g., '6.0.0(20)' or '6.0.2(22)')" },
-              "compileSdkVersion": { "type": ["string", "number"], "description": "旧版编译 SDK 版本 (legacy, e.g., 14)" },
+              "compatibleSdkVersion": {"type": ["string", "number"], "description": "允许安装应用的最低 SDK。最低版本 ≤ 目标版本 ≤ 编译版本。API 26 起使用 26.0.0 等字符串。早期工程可见 6.1.1(24) 或数字 24。"},
+              "targetSdkVersion": {"type": ["string", "number"], "description": "目标 SDK 决定应用适配的行为。省略时使用编译 SDK。API 26 起填写三段字符串，如 26.0.0。"},
+              "compileSdkVersion": {"type": ["string", "number"], "description": "用于构建的 SDK。HarmonyOS 默认使用 DevEco Studio 自带的 SDK；OpenHarmony 需显式设置。API 26 起两者都使用三段版本号。"},
               "runtimeOS": { "type": "string", "enum": ["HarmonyOS", "OpenHarmony"] },
               "bundleName": { "type": "string", "description": "应用包名 / Bundle name (API 13+)" },
               "buildOption": {

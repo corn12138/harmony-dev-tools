@@ -4,6 +4,7 @@ import { readBundleName, readEntryAbility } from '../utils/projectMetadata';
 import { buildHdcTargetArgs, execHdc } from '../utils/hdc';
 import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { chooseAutoDevice, getActiveDeviceId, getConnectedDeviceState } from '../device/devices';
+import { quoteShellArg } from '../utils/shell';
 
 /**
  * HarmonyOS Debug Configuration Provider
@@ -153,7 +154,7 @@ class HarmonyDebugAdapter implements vscode.DebugAdapter {
       // Step 3: Launch app in debug mode
       this.sendEvent('output', { category: 'console', output: 'Launching app in debug mode...\n' });
       await execHdc(
-        [...targetArgs, 'shell', `aa start -a ${abilityName} -b ${bundleName} -D`],
+        [...targetArgs, 'shell', `aa start -a ${quoteShellArg(abilityName, 'linux')} -b ${quoteShellArg(bundleName, 'linux')} -D`],
         { timeout: 10_000 }
       );
 

@@ -33,7 +33,7 @@ describe('hvigor fallback resolution', () => {
       expect(result.source).toBe('external');
       expect(result.executablePath).toBe('/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw');
       expect(result.command).toBe("'/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw' assembleHap --no-daemon");
-      expect(result.warnings.some((warning) => warning.includes('hvigor/hvigor-wrapper.js'))).toBe(true);
+      expect(result.warnings.some((warning) => warning.includes(path.join('hvigor', 'hvigor-wrapper.js')))).toBe(true);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

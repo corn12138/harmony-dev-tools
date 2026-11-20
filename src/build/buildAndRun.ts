@@ -480,8 +480,9 @@ async function launchApp(device: string, rootUri: vscode.Uri): Promise<StepOutco
   const fullAbility = abilityName || 'EntryAbility';
 
   try {
-    const safeAbility = quoteShellArg(fullAbility);
-    const safeBundle = quoteShellArg(bundleName);
+    // HDC passes this command to the device's POSIX shell on every host OS.
+    const safeAbility = quoteShellArg(fullAbility, 'linux');
+    const safeBundle = quoteShellArg(bundleName, 'linux');
     await execHdc(
       [...buildHdcTargetArgs(device), 'shell', `aa start -a ${safeAbility} -b ${safeBundle}`],
       { timeout: 10_000 }

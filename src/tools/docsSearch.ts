@@ -9,7 +9,7 @@ interface DocItem extends vscode.QuickPickItem {
 const OFFICIAL_SHORTCUTS: DocItem[] = [
   {
     label: 'HarmonyOS 版本说明 / Release Notes',
-    detail: `查看公开版本历史，当前已知最新公开版本为 ${LATEST_HARMONY_RELEASE.sdkVersion}`,
+    detail: `查看公开版本历史，推荐正式版为 ${LATEST_HARMONY_RELEASE.sdkVersion}`,
     docUrl: 'https://developer.huawei.com/consumer/en/doc/harmonyos-releases/overview-allversion',
   },
   {

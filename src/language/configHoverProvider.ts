@@ -10,9 +10,9 @@ import * as vscode from 'vscode';
 
 const CONFIG_KEY_DOCS: Record<string, Record<string, string>> = {
   'build-profile': {
-    targetSdkVersion: '目标 SDK 版本。新版 HarmonyOS 5.x/6.x 工程通常使用字符串版本号，例如 `6.0.0(20)` 或 `6.0.2(22)`。\n\nTarget SDK version. Modern HarmonyOS projects usually use release strings such as `6.0.0(20)` or `6.0.2(22)`.',
-    compileSdkVersion: '旧版编译 SDK 版本号（如 12、13、14）。为兼容历史工程保留，新工程更常见的是 `targetSdkVersion`。\n\nLegacy compile SDK version number. Retained for older projects; newer projects more commonly use `targetSdkVersion`.',
-    compatibleSdkVersion: '最低兼容 SDK 版本。可以是数字（如 14）或新版字符串（如 `5.0.5(17)`）。\n\nMinimum compatible SDK version. Can be a plain number or a release string such as `5.0.5(17)`.',
+    targetSdkVersion: '目标 SDK 决定应用适配的行为。省略时使用编译 SDK。API 26 起填写三段字符串，如 `26.0.0`。\n\nTarget SDK defaults to the compile SDK. Use a three-part string starting with API 26.',
+    compileSdkVersion: '用于构建的 SDK。HarmonyOS 默认使用 DevEco Studio 自带的 SDK；OpenHarmony 需显式设置。API 26 起两者都使用三段版本号。\n\nBuild SDK. HarmonyOS defaults to the bundled SDK. OpenHarmony requires an explicit value.',
+    compatibleSdkVersion: '允许安装应用的最低 SDK。最低版本 ≤ 目标版本 ≤ 编译版本。API 26 起使用 `26.0.0` 等字符串。早期工程可见 `6.1.1(24)` 或数字 `24`。\n\nMinimum installable SDK. Keep it at or below the target SDK.',
     products: '产品维度配置数组。每个 product 定义一个构建变体（如 default）。\n\nProduct flavor configurations array.',
     modules: '模块列表，每个模块引用 entry/feature/har 目录。\n\nModule list referencing entry/feature/har directories.',
     signingConfigs: '签名配置，包含 keystore 路径、密码等。发布前必须配置。\n\nSigning configurations for release builds.',

@@ -34,6 +34,11 @@ describe('hvigor utils', () => {
     expect(detectHvigorRuntimeReferences(script)).toEqual(['hvigor/hvigor-wrapper.js']);
   });
 
+  it('distinguishes the Windows JavaScript wrapper from the extensionless executable', () => {
+    expect(detectHvigorRuntimeReferences(String.raw`set HVIGOR_WRAPPER_SCRIPT=%~dp0hvigor\bin\hvigorw.js`))
+      .toEqual(['hvigor/bin/hvigorw.js']);
+  });
+
   it('should report missing hvigor runtime files referenced by hvigorw', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'harmony-hvigor-'));
     try {
@@ -46,7 +51,7 @@ describe('hvigor utils', () => {
       const result = inspectHvigorProjectSetup(root, 'darwin');
       expect(result.exists).toBe(true);
       expect(result.missingRuntimePaths).toEqual([path.join(root, 'hvigor', 'hvigor-wrapper.js')]);
-      expect(formatHvigorProjectSetupIssue(root, result)).toContain('hvigor/hvigor-wrapper.js');
+      expect(formatHvigorProjectSetupIssue(root, result)).toContain(path.join('hvigor', 'hvigor-wrapper.js'));
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

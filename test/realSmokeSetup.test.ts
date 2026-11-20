@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { createHash } from 'crypto';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   assertRealSmokeHvigorBootstrapReady,
   collectSigningCandidates,
@@ -30,6 +30,8 @@ describe('real smoke setup', () => {
   const tempRoots: string[] = [];
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     for (const root of tempRoots.splice(0)) {
       fs.rmSync(root, { recursive: true, force: true });
     }
@@ -63,9 +65,9 @@ describe('real smoke setup', () => {
       {
         "name": "debug",
         "material": {
-          "profile": "${path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p7b')}",
-          "storeFile": "${path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p12')}",
-          "certpath": "${path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.cer')}",
+          "profile": ${JSON.stringify(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p7b'))},
+          "storeFile": ${JSON.stringify(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p12'))},
+          "certpath": ${JSON.stringify(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.cer'))},
           "keyAlias": "debugKey",
           "keyPassword": "key-secret",
           "signAlg": "SHA256withECDSA",
@@ -79,11 +81,16 @@ describe('real smoke setup', () => {
     const fixturePath = path.resolve(__dirname, 'fixtures/e2e-real-app');
     const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'harmony-real-smoke-workspace-'));
     const testHome = fs.mkdtempSync(path.join(os.tmpdir(), 'harmony-real-smoke-home-'));
+    vi.stubEnv('HOME', testHome);
+    vi.stubEnv('USERPROFILE', testHome);
+    vi.stubEnv('LOCALAPPDATA', path.join(testHome, 'AppData', 'Local'));
     fs.mkdirSync(path.join(sdkRoot, 'toolchains'), { recursive: true });
     fs.writeFileSync(path.join(sdkRoot, 'toolchains', process.platform === 'win32' ? 'hdc.exe' : 'hdc'), '', 'utf8');
     const fakeEmulatorPath = process.platform === 'darwin'
       ? path.join(testHome, 'Applications', 'DevEco-Studio.app', 'Contents', 'tools', 'emulator', 'Emulator')
-      : path.join(testHome, 'Huawei', 'Sdk', 'hms', 'emulator', process.platform === 'win32' ? 'emulator.exe' : 'emulator');
+      : process.platform === 'win32'
+        ? path.join(testHome, 'AppData', 'Local', 'Huawei', 'Sdk', 'hms', 'emulator', 'emulator.exe')
+        : path.join(testHome, 'Huawei', 'Sdk', 'hms', 'emulator', 'emulator');
     fs.mkdirSync(path.dirname(fakeEmulatorPath), { recursive: true });
     fs.writeFileSync(fakeEmulatorPath, '', 'utf8');
     const prepared = await prepareRealSmokeWorkspace({
@@ -114,16 +121,17 @@ describe('real smoke setup', () => {
     });
 
     const buildProfileText = fs.readFileSync(path.join(prepared.workspacePath, 'build-profile.json5'), 'utf8');
-    expect(buildProfileText).toContain(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p7b'));
-    expect(buildProfileText).toContain(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p12'));
-    expect(buildProfileText).toContain(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.cer'));
-    expect(buildProfileText).toContain('store-secret');
+    const material = JSON.parse(buildProfileText).app.signingConfigs[0].material;
+    expect(material.profile).toBe(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p7b'));
+    expect(material.storeFile).toBe(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.p12'));
+    expect(material.certpath).toBe(path.join(signingRoot, 'auto_ohos_456_com.example.myapplication.cer'));
+    expect(material.storePassword).toBe('store-secret');
 
     const appJsonText = fs.readFileSync(path.join(prepared.workspacePath, 'AppScope', 'app.json5'), 'utf8');
     expect(appJsonText).toContain('"bundleName": "com.example.myapplication"');
 
     const localPropertiesText = fs.readFileSync(path.join(prepared.workspacePath, 'local.properties'), 'utf8');
-    expect(localPropertiesText).toContain(`sdk.dir=${sdkRoot}`);
+    expect(localPropertiesText).toContain(`sdk.dir=${sdkRoot.replace(/\\/g, '/')}`);
 
     const settingsText = fs.readFileSync(path.join(prepared.workspacePath, '.vscode', 'settings.json'), 'utf8');
     expect(settingsText).toContain(`"harmony.sdkPath": ${JSON.stringify(sdkRoot)}`);
@@ -195,11 +203,16 @@ describe('real smoke setup', () => {
     const realRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'harmony-real-smoke-real-'));
     const aliasParent = fs.mkdtempSync(path.join(os.tmpdir(), 'harmony-real-smoke-link-'));
     const aliasRoot = path.join(aliasParent, 'alias-root');
-    fs.symlinkSync(realRoot, aliasRoot, 'dir');
     tempRoots.push(fakeHome, realRoot, aliasParent);
-
     const workspacePath = getRealSmokeWorkspacePath(aliasRoot);
-    fs.mkdirSync(workspacePath, { recursive: true });
+    if (process.platform === 'win32') {
+      // Restricted Windows hosts may prohibit both symlinks and junctions.
+      // Supply the same canonical-path result without requiring that privilege.
+      vi.spyOn(fs.realpathSync, 'native').mockReturnValue(getRealSmokeWorkspacePath(realRoot));
+    } else {
+      fs.symlinkSync(realRoot, aliasRoot, 'dir');
+      fs.mkdirSync(workspacePath, { recursive: true });
+    }
     const status = getRealSmokeHvigorBootstrapStatus(workspacePath, {
       homeDir: fakeHome,
       platform: 'darwin',
@@ -207,6 +220,9 @@ describe('real smoke setup', () => {
 
     expect(status.projectHash).not.toBe(
       createHash('md5').update(workspacePath, 'utf8').digest('hex'),
+    );
+    expect(status.projectHash).toBe(
+      createHash('md5').update(fs.realpathSync.native(workspacePath), 'utf8').digest('hex'),
     );
   });
 
@@ -408,7 +424,7 @@ describe('real smoke setup', () => {
     expect(result.sdkHome).toBe(path.join(sdkB, 'default', 'hms'));
     expect(result.probe.ok).toBe(true);
     const localPropertiesText = fs.readFileSync(path.join(workspaceRoot, 'local.properties'), 'utf8');
-    expect(localPropertiesText).toContain(`sdk.dir=${path.join(sdkB, 'default', 'hms')}`);
+    expect(localPropertiesText).toContain(`sdk.dir=${path.join(sdkB, 'default', 'hms').replace(/\\/g, '/')}`);
   });
 
   it('keeps the real smoke fixture locked to a single phone device type', () => {

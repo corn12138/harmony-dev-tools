@@ -48,14 +48,14 @@ export async function listHdcTargets(timeout = 5000): Promise<string[]> {
 
 export async function execHdc(
   args: string[],
-  options: ExecFileOptionsWithStringEncoding = {},
+  options: Partial<ExecFileOptionsWithStringEncoding> = {},
 ): Promise<{ stdout: string; stderr: string }> {
   const hdc = await resolveHdcPath();
   try {
     return await execFileAsync(hdc, args, {
-      encoding: 'utf8',
       shell: shouldUseBatchShell(hdc),
       ...options,
+      encoding: options.encoding ?? 'utf8',
     });
   } catch (error) {
     throw coerceHdcCommandError(error, hdc, args);

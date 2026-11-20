@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { extractJson5StringValue } from '../utils/json5';
+import { readBuildProfile, checkProductSdkOrder } from '../utils/harmonySdk';
 import { analyzeBuildProfileMigration } from './buildProfileMigration';
 import { resolveSigningProfileInfo } from './signingProfile';
 import { hasWebViewUsage, parseWebDebuggingAccess } from '../webview/projectAnalysis';
@@ -8,7 +9,7 @@ import { hasWebViewUsage, parseWebDebuggingAccess } from '../webview/projectAnal
 export const PROJECT_CONFIG_DIAG_SOURCE = 'HarmonyOS Project';
 
 export const PROJECT_CONFIG_DIAG_CODES = {
-  TARGET_SDK_MISSING: 'harmony-target-sdk-missing',
+  SDK_VERSION_ORDER: 'harmony-sdk-version-order',
   BUILD_MODE_SET_MISSING: 'harmony-build-mode-set-missing',
   MODULE_PAGES_MISSING: 'harmony-module-pages-missing',
   PAGES_FILE_MISSING: 'harmony-pages-file-missing',
@@ -535,18 +536,32 @@ function toModuleRelativePath(filePath: string): string {
 }
 
 export function analyzeBuildProfileDiagnostics(text: string): AnalysisIssue[] {
-  const analysis = analyzeBuildProfileMigration(text);
-  return analysis.issues.map((issue) => ({
-    code: issue.code === 'targetSdkVersionMissing'
-      ? PROJECT_CONFIG_DIAG_CODES.TARGET_SDK_MISSING
-      : PROJECT_CONFIG_DIAG_CODES.BUILD_MODE_SET_MISSING,
+  const profile = readBuildProfile(text);
+  if (!profile) return [];
+  const issues: AnalysisIssue[] = analyzeBuildProfileMigration(text, profile).issues.map(issue => ({
+    code: PROJECT_CONFIG_DIAG_CODES.BUILD_MODE_SET_MISSING,
     message: issue.message,
-    severity: vscode.DiagnosticSeverity.Warning,
+    severity: vscode.DiagnosticSeverity.Information,
     target: 'buildProfile',
-    needle: issue.code === 'targetSdkVersionMissing'
-      ? 'compatibleSdkVersion'
-      : 'app',
+    needle: 'app',
   }));
+  const products = profile.app?.products;
+  if (Array.isArray(products)) {
+    for (const [index, product] of products.entries()) {
+      if (!product || typeof product !== 'object') continue;
+      const name = typeof product.name === 'string' ? product.name : `products[${index}]`;
+      for (const message of checkProductSdkOrder(product)) {
+        issues.push({
+          code: PROJECT_CONFIG_DIAG_CODES.SDK_VERSION_ORDER,
+          message: `${name}: ${message}。`,
+          severity: vscode.DiagnosticSeverity.Error,
+          target: 'buildProfile',
+          needle: typeof product.name === 'string' ? product.name : 'products',
+        });
+      }
+    }
+  }
+  return issues;
 }
 
 export function analyzeSigningBundleNameDiagnostics(
@@ -826,7 +841,8 @@ async function analyzeWorkspaceFolder(
 ): Promise<Map<string, vscode.Diagnostic[]> | undefined> {
   const snapshot = new Map<string, vscode.Diagnostic[]>();
   const buildProfileUri = vscode.Uri.joinPath(folder.uri, 'build-profile.json5');
-  const buildProfileText = await safeReadText(buildProfileUri);
+  const openProfile = vscode.workspace.textDocuments.find(doc => doc.uri.toString() === buildProfileUri.toString());
+  const buildProfileText = openProfile?.getText() ?? await safeReadText(buildProfileUri);
   if (buildProfileText) {
     const diagnostics = analyzeBuildProfileDiagnostics(buildProfileText).map((issue) => createDiagnostic(buildProfileText, issue));
     setDiagnosticsInSnapshot(snapshot, buildProfileUri, diagnostics);

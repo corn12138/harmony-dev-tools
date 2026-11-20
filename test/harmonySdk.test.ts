@@ -19,6 +19,14 @@ describe('harmonySdk', () => {
       expect(parseHarmonyApiLevel('6.0.2(22)')).toBe(22);
     });
 
+    it('reads the API major from three-component SDK versions starting at 26', () => {
+      expect(parseHarmonyApiLevel('26.0.0')).toBe(26);
+      expect(parseHarmonyApiLevel('26.0.1')).toBe(26);
+      expect(parseHarmonyApiLevel('26.1')).toBeNull();
+      expect(parseHarmonyApiLevel('26.0.0 beta')).toBeNull();
+      expect(parseHarmonyApiLevel('6.1.1(24)')).toBe(24);
+    });
+
     it('should return null for unsupported formats without api suffix', () => {
       expect(parseHarmonyApiLevel('6.0.2')).toBeNull();
     });
@@ -45,6 +53,14 @@ describe('harmonySdk', () => {
       });
     });
 
+    it('uses the default product and ignores SDK examples in comments', () => {
+      const result = detectHarmonySdkFromBuildProfile(`{app:{products:[
+        {name: 'tablet', targetSdkVersion: '6.1.1(24)'},
+        {name: 'default', /* targetSdkVersion: "6.0.2(22)" */ compileSdkVersion: '26.0.1'}
+      ]}}`);
+      expect(result).toEqual({ field: 'compileSdkVersion', rawValue: '26.0.1', apiLevel: 26 });
+    });
+
     it('should fall back to compileSdkVersion for legacy projects', () => {
       const result = detectHarmonySdkFromBuildProfile('compileSdkVersion: 14');
       expect(result).toEqual({
@@ -68,7 +84,7 @@ describe('harmonySdk', () => {
     it('should expose modern template defaults', () => {
       expect(DEFAULT_TEMPLATE_TARGET_SDK).toBe('6.0.0(20)');
       expect(DEFAULT_OH_PACKAGE_MODEL_VERSION).toBe('5.0.5');
-      expect(LATEST_HARMONY_RELEASE.sdkVersion).toBe('6.0.2(22)');
+      expect(LATEST_HARMONY_RELEASE.sdkVersion).toBe('26.0.0');
     });
   });
 });

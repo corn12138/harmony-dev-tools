@@ -266,7 +266,7 @@ function buildUpgradeSuggestions(apiVersion: number): string[] {
   }
 
   if (apiVersion < LATEST_HARMONY_RELEASE.apiLevel) {
-    tips.push(`官方最新公开版本: ${LATEST_HARMONY_RELEASE.label} (${LATEST_HARMONY_RELEASE.sdkVersion})。`);
+    tips.push(`推荐正式版: ${LATEST_HARMONY_RELEASE.label} (${LATEST_HARMONY_RELEASE.sdkVersion})。`);
   }
 
   return tips;

@@ -1,5 +1,6 @@
 .vscode/**
 .vscode-test/**
+tmp/**
 src/**
 test/**
 node_modules/**
@@ -7,8 +8,12 @@ node_modules/**
 docs/**
 scripts/**
 *.ts
-!dist/**
+dist/**
+!dist/extension.js
+*.vsix
 tsconfig.json
+tsconfig.e2e.json
+*.log
 vitest.config.ts
 .eslintrc.*
 ARCHITECTURE.md

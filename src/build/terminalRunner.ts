@@ -6,6 +6,7 @@ import { getPreferredWorkspaceFolder } from '../utils/workspace';
 import { ensureConnectedDevice, type ConnectedDevice } from '../device/devices';
 import { buildHdcTargetArgs, buildHdcTerminalCommand, rawTerminalArg } from '../utils/hdc';
 import { resolveAssembleHapPreflight } from './preflight';
+import { quoteShellArg } from '../utils/shell';
 
 let buildTerminal: vscode.Terminal | undefined;
 
@@ -167,7 +168,7 @@ function buildLaunchCommand(options: {
   bundleName: string;
   abilityName: string;
 }): string {
-  const aaCommand = `aa start -a ${options.abilityName} -b ${options.bundleName}`;
+  const aaCommand = `aa start -a ${quoteShellArg(options.abilityName, 'linux')} -b ${quoteShellArg(options.bundleName, 'linux')}`;
   return buildHdcTerminalCommand(
     options.hdc,
     [...buildHdcTargetArgs(options.deviceId), 'shell', aaCommand],
@@ -179,7 +180,7 @@ function buildStopCommand(options: {
   deviceId: string;
   bundleName: string;
 }): string {
-  const stopCommand = `aa force-stop ${options.bundleName}`;
+  const stopCommand = `aa force-stop ${quoteShellArg(options.bundleName, 'linux')}`;
   return buildHdcTerminalCommand(
     options.hdc,
     [...buildHdcTargetArgs(options.deviceId), 'shell', stopCommand],
@@ -200,6 +201,7 @@ function buildPosixBuildAndRunCommand(options: {
     platform,
   );
   const launchCommand = buildLaunchCommand(options);
+  const launchMessage = `[4/4] Launching ${options.bundleName}/${options.abilityName}...`;
 
   return [
     'echo "========== HarmonyOS Build & Run =========="',
@@ -215,7 +217,7 @@ function buildPosixBuildAndRunCommand(options: {
     'echo "[3/4] Installing to device..."',
     installCommand,
     'echo ""',
-    `echo "[4/4] Launching ${options.bundleName}/${options.abilityName}..."`,
+    `printf '%s\\n' ${quoteShellArg(launchMessage, 'linux')}`,
     launchCommand,
     'echo ""',
     'echo "========== App launched successfully =========="',
@@ -235,6 +237,7 @@ function buildPowerShellBuildAndRunCommand(options: {
     'win32',
   );
   const launchCommand = buildLaunchCommand(options);
+  const launchMessage = `[4/4] Launching ${options.bundleName}/${options.abilityName}...`;
 
   return [
     '$ErrorActionPreference = "Stop"',
@@ -252,7 +255,7 @@ function buildPowerShellBuildAndRunCommand(options: {
     installCommand,
     'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
     'Write-Host ""',
-    `Write-Host "[4/4] Launching ${options.bundleName}/${options.abilityName}..."`,
+    `Write-Host '${launchMessage.replace(/'/g, "''")}'`,
     launchCommand,
     'if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
     'Write-Host ""',

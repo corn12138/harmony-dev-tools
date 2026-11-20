@@ -1,3 +1,4 @@
+import * as path from 'path';
 import * as vscode from 'vscode';
 import {
   captureScreenshot,
@@ -48,7 +49,7 @@ export async function openDeviceMirror(deviceId?: string): Promise<void> {
     { enableScripts: true, retainContextWhenHidden: true }
   );
 
-  panel.iconPath = new vscode.ThemeIcon('device-mobile');
+  panel.iconPath = vscode.Uri.file(path.resolve(__dirname, '../resources/icons/icon.png'));
 
   panel.onDidDispose(() => {
     panel = undefined;

@@ -71,7 +71,10 @@ export function buildHvigorCommandWithExecutable(
 }
 
 export function detectHvigorRuntimeReferences(scriptContent: string): string[] {
-  return HVIGOR_RUNTIME_REFERENCES.filter((reference) => scriptContent.includes(reference));
+  const normalized = scriptContent.replace(/\\/g, '/');
+  const alternatives = HVIGOR_RUNTIME_REFERENCES.map(reference => reference.replace(/\./g, '\\.'));
+  const matches = normalized.match(new RegExp('(?:' + alternatives.join('|') + ')(?![\\w.-])', 'g')) ?? [];
+  return Array.from(new Set(matches));
 }
 
 export function inspectHvigorProjectSetup(

@@ -48,8 +48,8 @@ export async function runOnDevice(): Promise<void> {
               readEntryAbility(folder.uri),
             ]);
             if (bundleName) {
-              const safeAbility = quoteShellArg(abilityName || 'EntryAbility');
-              const safeBundle = quoteShellArg(bundleName);
+              const safeAbility = quoteShellArg(abilityName || 'EntryAbility', 'linux');
+              const safeBundle = quoteShellArg(bundleName, 'linux');
               await execHdc(
                 [...buildHdcTargetArgs(selected.id), 'shell', `aa start -a ${safeAbility} -b ${safeBundle}`],
                 { timeout: 10_000 }

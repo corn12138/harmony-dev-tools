@@ -12,7 +12,6 @@ async function ensureActivated(): Promise<void> {
 const SAFE_COMMANDS = [
   'harmony.viewDevices',
   'harmony.checkEnvironment',
-  'harmony.selectDevice',
   'harmony.clean',
   'harmony.formatDocument',
   'harmony.organizeImports',
@@ -65,6 +64,7 @@ suite('E2E: Commands Stress', () => {
   // --- Verify commands exist even if they need device context ---
 
   const DEVICE_COMMANDS = [
+    'harmony.selectDevice',
     'harmony.buildHap',
     'harmony.runOnDevice',
     'harmony.installHap',

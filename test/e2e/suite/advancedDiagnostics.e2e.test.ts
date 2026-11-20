@@ -33,6 +33,30 @@ suite('E2E: V1/V2 Mix & Advanced Diagnostics', () => {
     await ensureActivated();
   });
 
+  test('SDK diagnostics follow unsaved edits and migration preserves the implicit target', async () => {
+    const uri = fixtureUri('build-profile.json5');
+    const doc = await vscode.workspace.openTextDocument(uri);
+    const editor = await vscode.window.showTextDocument(doc);
+    const original = doc.getText();
+    const replace = (text: string) => editor.edit(edit => {
+      edit.replace(new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length)), text);
+    });
+    const profile = "{ app: { products: [{ name: 'default', compatibleSdkVersion: '26.0.1', compileSdkVersion: '26.0.0' }] } }";
+    const isSdkError = (diagnostic: vscode.Diagnostic) => diagnostic.code === 'harmony-sdk-version-order';
+    try {
+      assert.ok(await replace(profile));
+      assert.ok((await waitForDiagnostics(uri, items => items.some(isSdkError))).some(isSdkError));
+      assert.ok(await replace(profile.replace('26.0.1', '26.0.0')));
+      assert.ok(!(await waitForDiagnostics(uri, items => !items.some(isSdkError))).some(isSdkError));
+      await vscode.commands.executeCommand('harmony.migrateBuildProfile', uri);
+      assert.ok(doc.getText().includes('buildModeSet'));
+      assert.ok(!doc.getText().includes('targetSdkVersion'));
+    } finally {
+      assert.ok(await replace(original));
+      assert.ok(await doc.save());
+    }
+  }).timeout(25000);
+
   test('Detects arkts-v1v2-mix when V1 decorators used in @ComponentV2', async () => {
     const fileUri = fixtureUri('entry/src/main/ets/pages/V1V2Mix.ets');
     const doc = await vscode.workspace.openTextDocument(fileUri);

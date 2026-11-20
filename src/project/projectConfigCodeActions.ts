@@ -41,7 +41,6 @@ class ProjectConfigCodeActionProvider implements vscode.CodeActionProvider {
       }
 
       switch (diagnostic.code) {
-        case PROJECT_CONFIG_DIAG_CODES.TARGET_SDK_MISSING:
         case PROJECT_CONFIG_DIAG_CODES.BUILD_MODE_SET_MISSING:
           actions.push(this.createBuildProfileMigrationAction(document.uri, diagnostic));
           break;

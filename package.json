@@ -2,7 +2,7 @@
   "name": "harmony-dev-tools",
   "displayName": "HarmonyOS Dev Tools",
   "description": "Build, run, debug, inspect, and validate HarmonyOS apps directly in VS Code",
-  "version": "0.8.3",
+  "version": "0.8.5",
   "publisher": "corn12138",
   "license": "MIT",
   "icon": "resources/icons/icon.png",
@@ -688,18 +688,24 @@
     ]
   },
   "scripts": {
+    "vscode:prepublish": "pnpm run build:prod && pnpm run size-check",
     "build": "esbuild src/extension.ts --bundle --outdir=dist --external:vscode --format=cjs --platform=node --target=es2022 --sourcemap",
     "build:prod": "pnpm build --minify --tree-shaking=true",
     "watch": "pnpm build --watch",
     "lint": "eslint src --ext ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "tsc -p tsconfig.e2e.json && node ./dist/test/e2e/runTest.js",
-    "test:e2e:host": "tsc -p tsconfig.e2e.json && node ./dist/test/e2e/runHostTest.js",
+    "typecheck": "tsc --noEmit",
+    "check": "pnpm run typecheck && pnpm test && pnpm run build:prod && pnpm run size-check",
+    "test:e2e": "pnpm run build && tsc -p tsconfig.e2e.json && node ./dist/test/e2e/runTest.js",
+    "test:e2e:host": "pnpm run build && tsc -p tsconfig.e2e.json && node ./dist/test/e2e/runHostTest.js",
     "test:e2e:all": "pnpm test:e2e:host && pnpm test:e2e",
     "package": "vsce package --no-dependencies",
     "publish": "vsce publish --no-dependencies",
     "size-check": "node scripts/size-check.js"
+  },
+  "dependencies": {
+    "json5": "^2.2.3"
   },
   "devDependencies": {
     "@types/glob": "^9.0.0",

@@ -223,4 +223,22 @@ describe('buildAndRun', () => {
       hapPath: '/workspace/demo/entry/build/default/outputs/default/app.hap',
     });
   });
+
+  it('quotes launch arguments for the device POSIX shell even on Windows hosts', async () => {
+    mockGetConnectedDeviceState.mockResolvedValue({
+      devices: [{ id: 'usb-001', name: 'phone', type: 'device', status: 'online' }],
+    });
+    mockReadBundleName.mockResolvedValue('com.demo.app');
+    mockReadEntryAbility.mockResolvedValue("Entry'Ability");
+    mockExecHdc.mockResolvedValue({ stdout: 'ok', stderr: '' });
+
+    const { buildAndRun } = await import('../src/build/buildAndRun');
+    const result = await buildAndRun({ postLaunchAction: 'none' });
+
+    expect(result.ok).toBe(true);
+    expect(mockExecHdc).toHaveBeenLastCalledWith(
+      ['-t', 'usb-001', 'shell', "aa start -a 'Entry'\\''Ability' -b 'com.demo.app'"],
+      { timeout: 10_000 },
+    );
+  });
 });

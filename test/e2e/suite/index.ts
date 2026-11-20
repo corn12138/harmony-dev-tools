@@ -7,6 +7,7 @@ export function run(): Promise<void> {
   const mocha = new Mocha({
     ui: 'tdd',
     color: true,
+    grep: process.env.HARMONY_E2E_GREP,
     timeout: 30000 // UI tests can be slow
   });
 

@@ -67,7 +67,7 @@ describe('local signing discovery', () => {
     const { getEffectiveLocalSigningDirs } = await import('../src/project/localSigning');
     const dirs = getEffectiveLocalSigningDirs('/Users/tester');
 
-    expect(dirs[0]).toBe('/Users/tester/custom-signing');
-    expect(dirs).toContain('/Users/tester/.ohos/config');
+    expect(dirs[0]).toBe(path.join('/Users/tester', 'custom-signing'));
+    expect(dirs).toContain(path.join('/Users/tester', '.ohos', 'config'));
   });
 });

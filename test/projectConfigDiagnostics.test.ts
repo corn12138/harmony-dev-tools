@@ -18,18 +18,18 @@ import {
 
 describe('projectConfigDiagnostics', () => {
   describe('build-profile migration diagnostics', () => {
-    it('should warn when targetSdkVersion is missing', () => {
-      const diagnostics = analyzeBuildProfileDiagnostics(`{
-  app: {
-    products: [
-      {
-        compatibleSdkVersion: "5.0.5(17)"
-      }
-    ]
-  }
-}`);
-
-      expect(diagnostics.some((item) => item.code === PROJECT_CONFIG_DIAG_CODES.TARGET_SDK_MISSING)).toBe(true);
+    it('compares SDKs within each product, including patch versions', () => {
+      const diagnostics = analyzeBuildProfileDiagnostics(`{app:{buildModeSet:[],products:[
+        {name:'phone', compatibleSdkVersion:'6.1.1(24)', targetSdkVersion:'26.0.0'},
+        {name:'tablet', compatibleSdkVersion:'26.0.1', compileSdkVersion:'26.0.0'},
+        {name:'tv', targetSdkVersion:'26.10.0', compileSdkVersion:'26.2.0'},
+        {name:'watch', compatibleSdkVersion:23}
+      ]}}`);
+      expect(diagnostics.map(item => item.message)).toEqual([
+        'tablet: compatibleSdkVersion (26.0.1) 超过 compileSdkVersion (26.0.0)。',
+        'tv: targetSdkVersion (26.10.0) 超过 compileSdkVersion (26.2.0)。',
+      ]);
+      expect(diagnostics.every(item => item.code === PROJECT_CONFIG_DIAG_CODES.SDK_VERSION_ORDER)).toBe(true);
     });
 
     it('should not warn for modern build-profile content', () => {

@@ -373,6 +373,22 @@ If auto-detection still misses, run `HarmonyOS: Check SDK / HDC Environment`. Th
 4. 如果未填写端口，扩展会自动补上 `harmony.wifiDefaultPort`。
 5. 一旦连接成功过一次，下次会自动预填上一次成功的 `ip:port`。
 
+### Release Checks / 发布检查
+
+Use the pinned package manager and locked dependencies, then run:
+使用项目指定的 pnpm 版本安装锁定依赖后，运行：
+
+```sh
+pnpm install --frozen-lockfile
+pnpm run check
+pnpm run test:e2e:host
+pnpm run package
+```
+
+`check` runs TypeScript validation, unit tests, a production build and the 512 KiB bundle-size check. Packaging rebuilds the extension and checks its size again. Extension-host E2E requires a working desktop/display environment. Hardware smoke also needs the SDK, signing materials and a device described below.
+
+`check` 执行 TypeScript 检查、单元测试、生产构建和 512 KiB 主文件体积检查。打包会重新构建并检查体积。编辑器 E2E 需要可用的桌面显示环境；设备 smoke 还需要下述 SDK、签名材料和设备。
+
 ### Real Smoke E2E / 真实 Smoke E2E
 
 `pnpm test:e2e` uses the bundled real HarmonyOS fixture project and your local DevEco / SDK / signing materials.
